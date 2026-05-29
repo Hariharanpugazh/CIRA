@@ -14,6 +14,12 @@ export default defineConfig({
   server: {
     port: 5173,
     strictPort: true,
+    // Vite >= 5.4 blocks cross-origin requests by default, which breaks the
+    // crxjs service-worker loader (it fetches `@vite/env` from localhost from
+    // a `chrome-extension://` origin). Allow the extension origin explicitly.
+    cors: {
+      origin: [/chrome-extension:\/\//],
+    },
     hmr: {
       port: 5173,
     },

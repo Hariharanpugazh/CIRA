@@ -1,15 +1,4 @@
-/**
- * Rule-based context compression.
- *
- * Given a Conversation, produce a structured prompt that captures:
- *   - Project / domain context
- *   - Key decisions
- *   - Open questions / current task
- *   - Important code blocks
- *
- * Phase 1 keeps this fully local and heuristic. Phase 2 will offer an
- * optional LLM-powered "Smart Summary" toggle.
- */
+import { encode } from 'gpt-tokenizer';
 import type { CodeBlock, Conversation, Message } from '@/core/schema';
 
 const CODE_FENCE = /```([\w+-]*)\n([\s\S]*?)```/g;
@@ -65,14 +54,22 @@ function pickTop(sentences: string[], hints: RegExp[], max: number): string[] {
     .map((x) => `- ${x.s}`);
 }
 
-function dedupe(lines: string[]): string[] {
+function dedupe(lines: string[], threshold = 120): string[] {
   const seen = new Set<string>();
   return lines.filter((l) => {
-    const key = l.toLowerCase().replace(/\s+/g, ' ').slice(0, 120);
+    const key = l.toLowerCase().replace(/\s+/g, ' ').slice(0, threshold);
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
   });
+}
+
+function lastMessages(messages: Message[], n: number): Message[] {
+  const result: Message[] = [];
+  for (let i = messages.length - 1; i >= 0 && result.length < n; i--) {
+    result.unshift(messages[i]);
+  }
+  return result;
 }
 
 function lastUserMessage(messages: Message[]): string | undefined {
@@ -82,18 +79,24 @@ function lastUserMessage(messages: Message[]): string | undefined {
   return undefined;
 }
 
+export function countTokens(text: string): number {
+  return encode(text).length;
+}
+
 export interface CompressOptions {
-  /** Hard cap on characters in the final summary. */
   maxChars?: number;
-  /** Max code blocks to include verbatim. */
   maxCodeBlocks?: number;
+  maxTokens?: number;
+  preserveLastN?: number;
+  deduplicateThreshold?: number;
 }
 
 export function compress(conv: Conversation, opts: CompressOptions = {}): string {
   const maxChars = opts.maxChars ?? 6_000;
   const maxCodeBlocks = opts.maxCodeBlocks ?? 3;
+  const preserveLastN = opts.preserveLastN ?? 0;
+  const deduplicateThreshold = opts.deduplicateThreshold ?? 120;
 
-  // 1. Extract code blocks across the whole conversation.
   const allCode: CodeBlock[] = [];
   const cleanedMessages = conv.messages.map((m) => {
     const { stripped, code } = extractCodeBlocks(m.content);
@@ -101,7 +104,6 @@ export function compress(conv: Conversation, opts: CompressOptions = {}): string
     return { ...m, content: stripped };
   });
 
-  // 2. Build sentence pool (skip the [code:...] markers).
   const userSentences = cleanedMessages
     .filter((m) => m.role === 'user')
     .flatMap((m) => splitSentences(m.content));
@@ -109,16 +111,16 @@ export function compress(conv: Conversation, opts: CompressOptions = {}): string
     .filter((m) => m.role === 'assistant')
     .flatMap((m) => splitSentences(m.content));
 
-  // 3. Score and pick.
   const projectContext = dedupe(
     pickTop([...userSentences, ...assistantSentences], CONTEXT_HINTS, 6),
+    deduplicateThreshold,
   );
   const decisions = dedupe(
     pickTop([...userSentences, ...assistantSentences], DECISION_HINTS, 6),
+    deduplicateThreshold,
   );
-  const tasks = dedupe(pickTop(userSentences, TASK_HINTS, 4));
+  const tasks = dedupe(pickTop(userSentences, TASK_HINTS, 4), deduplicateThreshold);
 
-  // 4. Pick the most "interesting" code blocks: longest, then most recent.
   const rankedCode = [...allCode]
     .map((c, i) => ({ c, i, score: Math.min(c.code.length, 4_000) }))
     .sort((a, b) => b.score - a.score || b.i - a.i)
@@ -127,7 +129,6 @@ export function compress(conv: Conversation, opts: CompressOptions = {}): string
 
   const lastTask = lastUserMessage(conv.messages)?.slice(0, 600);
 
-  // 5. Assemble.
   const sections: string[] = [];
   sections.push(
     `# Context handoff from ${conv.source.toUpperCase()}`,
@@ -158,6 +159,14 @@ export function compress(conv: Conversation, opts: CompressOptions = {}): string
     }
   }
 
+  if (preserveLastN > 0) {
+    const recent = lastMessages(conv.messages, preserveLastN);
+    sections.push('## Recent messages (verbatim)');
+    for (const msg of recent) {
+      sections.push(`**${msg.role}:** ${msg.content.slice(0, 400)}`, '');
+    }
+  }
+
   sections.push(
     '## Your job',
     'Acknowledge the handoff in one sentence, then continue helping with the most recent user message above.',
@@ -168,4 +177,41 @@ export function compress(conv: Conversation, opts: CompressOptions = {}): string
     out = out.slice(0, maxChars - 20) + '\n...[truncated]';
   }
   return out;
+}
+
+export interface CompressWithTuningResult {
+  summary: string;
+  method: 'rule-based' | 'llm-fallback';
+  tokenCount: number;
+}
+
+export async function compressWithTuning(
+  conv: Conversation,
+  targetTokens: number,
+): Promise<CompressWithTuningResult> {
+  const maxChars = targetTokens * 4;
+  const summary = compress(conv, { maxChars, maxCodeBlocks: 3, preserveLastN: 2 });
+  const tokenCount = countTokens(summary);
+
+  if (tokenCount <= targetTokens) {
+    return { summary, method: 'rule-based', tokenCount };
+  }
+
+  const aggressivelyTrimmed = compress(conv, {
+    maxChars: Math.floor(targetTokens * 3.5),
+    maxCodeBlocks: 1,
+    preserveLastN: 1,
+  });
+  const trimmedTokens = countTokens(aggressivelyTrimmed);
+
+  if (trimmedTokens <= targetTokens) {
+    return { summary: aggressivelyTrimmed, method: 'rule-based', tokenCount: trimmedTokens };
+  }
+
+  return { summary: aggressivelyTrimmed, method: 'llm-fallback', tokenCount: trimmedTokens };
+}
+
+export function formatContextTag(summary: string): string {
+  const truncated = summary.length > 2_000 ? summary.slice(0, 2_000) + '\n...[truncated]' : summary;
+  return `<cira-context>\n${truncated}\n</cira-context>`;
 }

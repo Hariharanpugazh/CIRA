@@ -1,10 +1,9 @@
-/**
- * Small DOM helpers shared by content scripts.
- */
+import { detectSource } from '@/shared/utils';
 
-/**
- * Wait for an element matching `selector` to appear, or resolve null after `timeoutMs`.
- */
+export function getPlatformFromURL(url?: string): string {
+  return detectSource(url);
+}
+
 export function waitForElement<T extends Element = Element>(
   selector: string,
   timeoutMs = 10_000,
@@ -32,9 +31,6 @@ export function waitForElement<T extends Element = Element>(
   });
 }
 
-/**
- * Run `cb` whenever the DOM mutates, debounced.
- */
 export function onDomChange(cb: () => void, debounceMs = 250): () => void {
   let t: number | undefined;
   const observer = new MutationObserver(() => {
@@ -48,9 +44,66 @@ export function onDomChange(cb: () => void, debounceMs = 250): () => void {
   return () => observer.disconnect();
 }
 
-/**
- * Collapse whitespace and trim.
- */
 export function cleanText(s: string): string {
   return s.replace(/\u00a0/g, ' ').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+
+export function injectScript(func: () => void): void {
+  const script = document.createElement('script');
+  script.textContent = `(${func.toString()})();`;
+  (document.head || document.documentElement).appendChild(script);
+  script.remove();
+}
+
+export function interceptFetch(onLimit: (url: string) => void): () => void {
+  const originalFetch = window.fetch.bind(window);
+
+  const patchedFetch: typeof fetch = async (input, init) => {
+    let urlStr = '';
+    if (typeof input === 'string') {
+      urlStr = input;
+    } else if (input instanceof Request) {
+      urlStr = input.url;
+    } else {
+      urlStr = input.toString();
+    }
+
+    const res = await originalFetch(input, init);
+
+    if (!res.ok && (res.status === 429 || res.status === 403)) {
+      const body = await res.clone().text().catch(() => '');
+      const rateLimitKeywords = ['rate_limit', 'rate limit', 'too many requests', 'quota'];
+      if (rateLimitKeywords.some((kw) => body.toLowerCase().includes(kw))) {
+        onLimit(urlStr);
+      }
+    }
+
+    return res;
+  };
+
+  window.fetch = patchedFetch;
+  return () => {
+    window.fetch = originalFetch;
+  };
+}
+
+export function fingerprint(elements: Element[]): string {
+  const parts = elements.map((el) => {
+    const clone = el.cloneNode(true) as HTMLElement;
+    const bubbles =
+      clone.querySelectorAll('[class*="tooltip"], [class*="popover"], [class*="toast"], [class*="menu"], [role="tooltip"], [role="menu"]') ??
+      [];
+    bubbles.forEach((b) => b.remove());
+    return clone.textContent ?? '';
+  });
+  return hashString(parts.join('\n'));
+}
+
+function hashString(s: string): string {
+  let hash = 0;
+  for (let i = 0; i < s.length; i++) {
+    const chr = s.charCodeAt(i);
+    hash = ((hash << 5) - hash + chr) | 0;
+  }
+  return hash.toString(36);
 }

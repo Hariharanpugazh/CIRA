@@ -1,5 +1,3 @@
-// Generates placeholder PNG icons for the extension at 16/32/48/128.
-// Pure Node, no native deps. Solid violet square. Replace with real art later.
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -61,7 +59,7 @@ function makePng(size, [r, g, b]) {
 }
 
 for (const size of [16, 32, 48, 128]) {
-  const png = makePng(size, [124, 58, 237]); // tailwind violet-600
+  const png = makePng(size, [0, 212, 170]); // #00d4aa teal
   const path = resolve(outDir, `icon-${size}.png`);
   writeFileSync(path, png);
   console.log('wrote', path);

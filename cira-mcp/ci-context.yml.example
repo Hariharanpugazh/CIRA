@@ -1,0 +1,64 @@
+// ──────────────────────────────────────────────────────────────────────────────
+// GitHub Actions workflow example: CIRA context relay in CI
+//
+// Copy this to .github/workflows/cira-context.yml in any repo.
+// ──────────────────────────────────────────────────────────────────────────────
+
+// name: CIRA Context Relay
+//
+// on:
+//   workflow_call:  # Reusable — call from other workflows
+//   workflow_dispatch:
+//
+// jobs:
+//   relay:
+//     runs-on: ubuntu-latest
+//     steps:
+//       - uses: actions/checkout@v4
+//         with:
+//           fetch-depth: 50
+//
+//       # ── Load previous context ──────────────────────────────────────
+//       - name: Download CIRA context
+//         uses: actions/download-artifact@v4
+//         with:
+//           name: cira-context
+//           path: .cira/
+//         continue-on-error: true
+//
+//       - name: Display context
+//         run: |
+//           if [ -f .cira/context.md ]; then
+//             echo "=== CIRA Context ==="
+//             cat .cira/context.md
+//           fi
+//
+//       # ── Your AI agent step (e.g., Claude Code) ─────────────────────
+//       - name: Run Code Agent with context
+//         env:
+//           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+//         run: |
+//           # Prepend context to session
+//           if [ -f .cira/context.md ]; then
+//             export CLAUDE_CONTEXT="$(cat .cira/context.md)"
+//           fi
+//           claude --print "Continue from the CIRA context above. ${{ github.event.head_commit.message }}"
+//
+//       # ── Save updated context ────────────────────────────────────────
+//       - name: Save CIRA context
+//         run: bash scripts/cira-ci.sh --save
+//
+//       - uses: actions/upload-artifact@v4
+//         with:
+//           name: cira-context
+//           path: .cira/
+//           retention-days: 7
+//
+//       # ── Optional: Notify MCP companion (webhook) ────────────────────
+//       - name: Notify MCP
+//         if: always()
+//         run: |
+//           curl -X POST https://your-cira-hook.example.com/webhook \
+//             -H "Authorization: Bearer ${{ secrets.CIRA_PAT }}" \
+//             -H "Content-Type: application/json" \
+//             -d "{\"repo\":\"$GITHUB_REPOSITORY\",\"branch\":\"$GITHUB_REF_NAME\",\"sha\":\"$GITHUB_SHA\",\"status\":\"$JOB_STATUS\"}"

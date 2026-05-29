@@ -1,0 +1,85 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: #212121;
+    --foreground: #ececec;
+    --card: #303030;
+    --card-foreground: #ececec;
+    --popover: #303030;
+    --popover-foreground: #ececec;
+    --primary: #f3f3f3;
+    --primary-foreground: #0d0d0d;
+    --secondary: #2d2d2d;
+    --secondary-foreground: #ececec;
+    --muted: #2d2d2d;
+    --muted-foreground: #b4b4b4;
+    --accent: rgba(255, 255, 255, 0.08);
+    --accent-foreground: #ececec;
+    --destructive: #fa423e;
+    --destructive-foreground: #ffffff;
+    --border: rgba(255, 255, 255, 0.12);
+    --input: #303030;
+    --ring: rgba(255, 255, 255, 0.40);
+    --radius: 0.5rem;
+    --sidebar: #181818;
+    --sidebar-foreground: #ececec;
+    --sidebar-primary: #f3f3f3;
+    --sidebar-primary-foreground: #0d0d0d;
+    --sidebar-accent: rgba(255, 255, 255, 0.08);
+    --sidebar-accent-foreground: #ececec;
+    --sidebar-border: rgba(255, 255, 255, 0.06);
+    --sidebar-ring: rgba(255, 255, 255, 0.30);
+  }
+
+  .theme {
+    --font-sans: 'Poppins', ui-sans-serif, -apple-system, system-ui, sans-serif;
+    --font-mono: 'Poppins', ui-monospace, monospace;
+  }
+
+  * {
+    border-color: var(--border);
+  }
+
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+  }
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  font-size: 13px;
+}
+
+::-webkit-scrollbar {
+  width: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 2px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.20);
+}
