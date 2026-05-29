@@ -49,11 +49,12 @@ startRateLimitMonitoring();
 chrome.runtime.onMessage.addListener((msg: RuntimeMessage, _sender, sendResponse) => {
   switch (msg.type) {
     case 'CIRA/EXTRACT_REQUEST': {
-      const conversation = extractConversation();
-      sendResponse({
-        type: 'CIRA/EXTRACT_RESPONSE',
-        conversation,
-      } satisfies RuntimeMessage);
+      void extractConversation().then((conversation) => {
+        sendResponse({
+          type: 'CIRA/EXTRACT_RESPONSE',
+          conversation,
+        } satisfies RuntimeMessage);
+      });
       return true;
     }
 

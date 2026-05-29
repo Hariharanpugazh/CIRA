@@ -1,6 +1,7 @@
 import { cleanText } from '@/shared/dom';
-import type { Conversation, Message, MediaAttachment, Role } from '@/core/schema';
+import type { Conversation, MediaAttachment, Message, Role } from '@/core/schema';
 import { getPlatformDefForUrl, getPlatformId, type PlatformDef } from '@/core/platforms/registry';
+import { pickAdapter } from '@/core/adapters';
 
 function trySelectors(selectors: string[]): HTMLElement[] {
   const seen = new Set<HTMLElement>();
@@ -29,7 +30,6 @@ function readRole(el: Element): Role {
 
 function readContent(el: Element): string {
   const parts: string[] = [];
-
   el.querySelectorAll('pre').forEach((pre) => {
     pre.setAttribute('data-cira-preserve', '1');
   });
@@ -69,17 +69,6 @@ function readContent(el: Element): string {
   return cleanText(parts.join(''));
 }
 
-function extractTitle(def: PlatformDef): string {
-  for (const sel of def.extractors.title) {
-    try {
-      if (sel === 'title') return document.title;
-    } catch {
-      continue;
-    }
-  }
-  return document.title || 'Untitled';
-}
-
 function inferRoleFromDef(def: PlatformDef, el: Element): Role {
   for (const sel of def.extractors.userMessages) {
     try {
@@ -114,27 +103,22 @@ function mergeMessages(userEls: HTMLElement[], assistantEls: HTMLElement[], def:
     .filter((m) => m.content.length > 0);
 }
 
-export function extractMedia(): MediaAttachment[] {
-  const attachments: MediaAttachment[] = [];
-  try {
-    document.querySelectorAll('pre code[class*="language-"], pre code').forEach((code) => {
-      const lang = code.className.match(/language-([\w+-]+)/)?.[1] ?? 'text';
-      const text = code.textContent ?? '';
-      if (text.length > 0) {
-        attachments.push({
-          url: '',
-          type: 'code',
-          name: `code.${lang}`,
-          mimeType: `text/x-${lang}`,
-        });
-      }
-    });
-  } catch {
+function extractTitle(def: PlatformDef): string {
+  for (const sel of def.extractors.title) {
+    try {
+      if (sel === 'title') return document.title;
+    } catch {
+      continue;
+    }
   }
-  return attachments;
+  return document.title || 'Untitled';
 }
 
-export function extractConversation(): Conversation {
+/**
+ * Legacy fallback used when no adapter matches the active host. Same logic
+ * the project shipped with — broad selectors per platform definition.
+ */
+function extractWithLegacy(): Conversation {
   const def = getPlatformDefForUrl(location.href);
   const source = getPlatformId();
 
@@ -153,4 +137,51 @@ export function extractConversation(): Conversation {
     capturedAt: new Date().toISOString(),
     messages,
   };
+}
+
+/**
+ * Public extractor. When the active host has a verified adapter we delegate
+ * to it; otherwise we fall back to the original broad-selector extraction.
+ */
+export async function extractConversation(): Promise<Conversation> {
+  const adapter = pickAdapter(location.hostname);
+  if (adapter) {
+    try {
+      const result = await adapter.extract();
+      if (result.messages.length > 0) return result;
+    } catch {
+      // Fall through to legacy on any adapter failure.
+    }
+  }
+  return extractWithLegacy();
+}
+
+/**
+ * Synchronous extractor for callers that can't await (the live-sync
+ * MutationObserver loop). Skips adapters that need async work and uses the
+ * legacy broad-selector path. Good enough for fingerprinting and live diff.
+ */
+export function extractConversationSync(): Conversation {
+  return extractWithLegacy();
+}
+
+export function extractMedia(): MediaAttachment[] {
+  const attachments: MediaAttachment[] = [];
+  try {
+    document.querySelectorAll('pre code[class*="language-"], pre code').forEach((code) => {
+      const lang = code.className.match(/language-([\w+-]+)/)?.[1] ?? 'text';
+      const text = code.textContent ?? '';
+      if (text.length > 0) {
+        attachments.push({
+          url: '',
+          type: 'code',
+          name: `code.${lang}`,
+          mimeType: `text/x-${lang}`,
+        });
+      }
+    });
+  } catch {
+    // ignore
+  }
+  return attachments;
 }
