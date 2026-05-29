@@ -11,6 +11,35 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { TARGET_LABELS, TARGET_URLS, PLATFORM_BADGE } from '@/shared/urls';
 import { detectSource, timeAgo, getAvailableTargets } from '@/shared/utils';
+import { PlatformAvatar } from '@/components/brand-icons';
+import { Logo } from '@/components/Logo';
+
+interface PlatformBrand { name: string; initial: string; color: string }
+
+const PLATFORM_BRAND: Record<string, PlatformBrand> = {
+  chatgpt: { name: 'ChatGPT', initial: 'G', color: '#10a37f' },
+  claude: { name: 'Claude', initial: 'C', color: '#d97757' },
+  gemini: { name: 'Gemini', initial: 'G', color: '#4285f4' },
+  deepseek: { name: 'DeepSeek', initial: 'D', color: '#4d6bfe' },
+  perplexity: { name: 'Perplexity', initial: 'P', color: '#20808d' },
+  copilot: { name: 'Copilot', initial: 'M', color: '#0a6cff' },
+  grok: { name: 'Grok', initial: 'X', color: '#1d9bf0' },
+  mistral: { name: 'Mistral', initial: 'M', color: '#fa520f' },
+  qwen: { name: 'Qwen', initial: 'Q', color: '#615ced' },
+  poe: { name: 'Poe', initial: 'P', color: '#5d3fd3' },
+  kimi: { name: 'Kimi', initial: 'K', color: '#6c5ce7' },
+  huggingchat: { name: 'HuggingChat', initial: 'H', color: '#ff9d00' },
+  notebooklm: { name: 'NotebookLM', initial: 'N', color: '#1a73e8' },
+  you: { name: 'You.com', initial: 'Y', color: '#7c3aed' },
+  characterai: { name: 'Character.AI', initial: 'A', color: '#5b6ee1' },
+  pi: { name: 'Pi', initial: '\u03C0', color: '#a78bfa' },
+  zai: { name: 'Z.ai', initial: 'Z', color: '#2d9cdb' },
+  unknown: { name: 'Unknown', initial: '?', color: '#7d7d7d' },
+};
+
+function brandFor(source: string): PlatformBrand {
+  return PLATFORM_BRAND[source] ?? PLATFORM_BRAND.unknown;
+}
 
 type Tab = 'relay' | 'search' | 'templates' | 'stats';
 
@@ -183,9 +212,15 @@ export function Popup() {
   return (
     <div className="popup-root">
       <div className="app-header">
+        <Logo size={20} />
         <span className="app-header-title">CIRA</span>
         <span className="app-header-sub">RELAY</span>
-        {source !== 'unknown' && <Badge variant="secondary" style={{ marginLeft: 'auto', fontSize: 10 }}>{source}</Badge>}
+        {source !== 'unknown' && (
+          <Badge variant="secondary" style={{ marginLeft: 'auto', fontSize: 10, display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+            <PlatformAvatar source={source} initial={brandFor(source).initial} color={brandFor(source).color} size={14} radius={4} />
+            {brandFor(source).name}
+          </Badge>
+        )}
       </div>
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)} style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
@@ -198,9 +233,13 @@ export function Popup() {
 
         <TabsContent value="relay" className="flex-1 overflow-y-auto" style={{ maxHeight: 380 }}>
           <div className="platform-status">
-            <div className="platform-status-icon">{PLATFORM_BADGE[source] || '?'}</div>
+            <div className="platform-status-icon" style={source === 'unknown' ? undefined : { background: 'transparent', padding: 0 }}>
+              {source === 'unknown'
+                ? (PLATFORM_BADGE[source] || '?')
+                : <PlatformAvatar source={source} initial={brandFor(source).initial} color={brandFor(source).color} size={32} radius={8} />}
+            </div>
             <div style={{ flex: 1 }}>
-              <div className="platform-status-name">{source === 'unknown' ? 'No AI platform detected' : source}</div>
+              <div className="platform-status-name">{source === 'unknown' ? 'No AI platform detected' : brandFor(source).name}</div>
               <div className="platform-status-meta">
                 {capturing ? 'Scanning...' : conv ? `${conv.messages.length} messages · ~${tokenEstimate.toLocaleString()} tokens` : source !== 'unknown' ? 'Click Capture to extract' : 'Open an AI chat tab'}
               </div>
@@ -238,8 +277,10 @@ export function Popup() {
                 disabled={relayLoading !== null}
                 onClick={() => handleRelay(target)}
                 className="w-full justify-start"
+                style={{ display: 'flex', alignItems: 'center', gap: 8 }}
               >
-                {relayLoading === target ? 'Relaying...' : TARGET_LABELS[target] || `Relay to ${target}`}
+                <PlatformAvatar source={target} initial={brandFor(target).initial} color={brandFor(target).color} size={20} radius={6} />
+                {relayLoading === target ? 'Relaying...' : TARGET_LABELS[target] || `Relay to ${brandFor(target).name}`}
               </Button>
             ))}
 
@@ -270,9 +311,9 @@ export function Popup() {
               <div className="section-header">Recent</div>
               {recentRelays.map((r) => (
                 <div key={r.id} className="recent-item" onClick={() => { if (r.url) chrome.tabs.create({ url: r.url }); }}>
-                  <div className="recent-item-dot" />
+                  <PlatformAvatar source={r.source} initial={brandFor(r.source).initial} color={brandFor(r.source).color} size={22} radius={6} />
                   <div className="recent-item-info">
-                    <div className="recent-item-path">{r.source} · {r.title}</div>
+                    <div className="recent-item-path">{brandFor(r.source).name} · {r.title}</div>
                     <div className="recent-item-time">{timeAgo(r.capturedAt)}</div>
                   </div>
                 </div>

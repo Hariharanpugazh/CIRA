@@ -7,6 +7,8 @@ import { Badge } from '@/components/ui/badge';
 import { TARGET_URLS } from '@/shared/urls';
 import { detectSource, timeAgo } from '@/shared/utils';
 import { getAllPlatforms } from '@/core/platforms/registry';
+import { PlatformAvatar } from '@/components/brand-icons';
+import { Logo } from '@/components/Logo';
 
 interface LiveContext {
   conversation: Conversation;
@@ -175,18 +177,16 @@ export function SidePanel() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: 'var(--background)', color: 'var(--foreground)', fontFamily: FONT_STACK }}>
       <header style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
-        <div style={{ width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 9, background: 'linear-gradient(145deg,#19c99b,#10a37f)', color: '#07120f' }}>
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" aria-hidden="true">
-            <path d="M13 2L4 14h6l-1 8 9-12h-6l1-8z" fill="currentColor" stroke="currentColor" strokeWidth="0.8" strokeLinejoin="round" />
-          </svg>
+        <div style={{ width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 9, background: '#fff' }}>
+          <Logo size={20} />
         </div>
         <div>
           <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: 0.01 }}>CIRA</div>
           <div style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>Carry your chat anywhere</div>
         </div>
         {source !== 'unknown' && (
-          <Badge variant="secondary" style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 500, padding: '4px 10px' }}>
-            <span style={{ width: 6, height: 6, borderRadius: 3, background: '#10a37f', display: 'inline-block', marginRight: 6 }} />
+          <Badge variant="secondary" style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 500, padding: '4px 10px', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <PlatformAvatar source={source} initial={here.initial} color={here.color} size={16} radius={5} />
             {here.name}
           </Badge>
         )}
@@ -257,11 +257,7 @@ export function SidePanel() {
                     onMouseOver={(e) => { if (!sending) (e.currentTarget as HTMLButtonElement).style.background = '#3a3a3a'; }}
                     onMouseOut={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--card)'; }}
                   >
-                    <span style={{
-                      width: 24, height: 24, borderRadius: 7, background: b.color, color: '#fff',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: 11, fontWeight: 600, flexShrink: 0,
-                    }}>{b.initial}</span>
+                    <PlatformAvatar source={target} initial={b.initial} color={b.color} size={24} radius={7} />
                     <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {sending === target ? 'Opening…' : b.name}
                     </span>
@@ -302,11 +298,7 @@ export function SidePanel() {
                   });
                 }}>
                   <CardContent style={{ padding: 10, display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <span style={{
-                      width: 26, height: 26, borderRadius: 8, background: b.color, color: '#fff',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: 11, fontWeight: 600, flexShrink: 0,
-                    }}>{b.initial}</span>
+                    <PlatformAvatar source={r.source} initial={b.initial} color={b.color} size={26} radius={8} />
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontWeight: 500, fontSize: 12.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.title}</div>
                       <div style={{ fontSize: 10.5, color: 'var(--muted-foreground)', marginTop: 2 }}>

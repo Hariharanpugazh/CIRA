@@ -3,6 +3,10 @@ import { getPlatformId, getAllPlatforms } from '@/core/platforms/registry';
 import type { RuntimeMessage } from '@/shared/messaging';
 import type { Source } from '@/core/schema';
 import { TARGET_URLS } from '@/shared/urls';
+import { getBrandIcon } from '@/shared/brand-icons-data';
+import logoRaw from '@/assets/logo.svg?raw';
+
+const LOGO_SVG = logoRaw.replace(/width="\d+(?:\.\d+)?" height="\d+(?:\.\d+)?"/, 'width="22" height="22"');
 
 const STORAGE_KEY_POS = 'cira.pill.position';
 const PILL_SIZE = 40;
@@ -60,13 +64,12 @@ PILL_TEMPLATE.innerHTML = `
     display: flex;
     align-items: center;
     justify-content: center;
-    background: linear-gradient(145deg, #19c99b, #10a37f);
+    background: #fff;
     border-radius: 50%;
-    color: #07120f;
-    box-shadow: 0 0 0 1px rgba(25,201,155,0.25), 0 2px 8px rgba(25,201,155,0.30);
+    box-shadow: 0 0 0 1px rgba(21,112,239,0.25), 0 2px 8px rgba(21,112,239,0.30);
     transition: transform 0.2s ease;
   }
-  .pill-icon svg { width: 18px; height: 18px; }
+  .pill-icon svg { width: 22px; height: 22px; }
   .pill-wrap:hover .pill-icon { transform: scale(1.04); }
   .pill-label {
     white-space: nowrap;
@@ -168,7 +171,9 @@ PILL_TEMPLATE.innerHTML = `
     font-size: 11px;
     font-weight: 600;
     color: #fff;
+    overflow: hidden;
   }
+  .menu-ava svg { width: 16px; height: 16px; display: block; }
   .menu-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .menu-divider {
     height: 1px;
@@ -180,9 +185,7 @@ PILL_TEMPLATE.innerHTML = `
 <div class="pill-wrap" part="pill-wrap">
   <div class="pill-inner" part="pill-inner">
     <div class="pill-icon" part="pill-icon">
-      <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-        <path d="M13 2L4 14h6l-1 8 9-12h-6l1-8z" fill="currentColor" stroke="currentColor" stroke-width="0.8" stroke-linejoin="round"/>
-      </svg>
+      ${LOGO_SVG}
     </div>
     <div class="pill-label" part="pill-label">Continue this chat</div>
   </div>
@@ -439,10 +442,14 @@ class CiraRelayPill extends HTMLElement {
 
   private _createTargetItem(id: string): HTMLButtonElement {
     const brand = PLATFORM_BRAND[id] ?? PLATFORM_BRAND.unknown;
+    const icon = getBrandIcon(id);
     const btn = document.createElement('button');
     btn.className = 'menu-item';
+    const ava = icon
+      ? `<span class="menu-ava" style="background:${icon.chipBg};color:${icon.fg};padding:4px">${icon.svg}</span>`
+      : `<span class="menu-ava" style="background:${brand.color}">${brand.initial}</span>`;
     btn.innerHTML = `
-      <span class="menu-ava" style="background:${brand.color}">${brand.initial}</span>
+      ${ava}
       <span class="menu-name">${brand.name}</span>
       <span class="menu-action">${ARROW_SVG}</span>
     `;
