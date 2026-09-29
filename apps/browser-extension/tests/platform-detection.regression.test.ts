@@ -30,6 +30,14 @@ const CASES: Array<[url: string, expected: string]> = [
 ];
 
 describe('platform detection', () => {
+  it('recognises https://chatgpt.com/... as ChatGPT without relying on chat.openai.com', () => {
+    const url = 'https://chatgpt.com/c/6abbf296-f460-83e8-b7e5-9df7ad7ea3b1';
+    expect(detectSource(url)).toBe('chatgpt');
+    expect(getPlatformDefForUrl(url).id).toBe('chatgpt');
+    expect(pickAdapter('chatgpt.com')?.id).toBe('chatgpt');
+    expect(pickAdapter('www.chatgpt.com')?.id).toBe('chatgpt');
+  });
+
   for (const [url, expected] of CASES) {
     it(`detects ${expected} for ${url}`, () => {
       expect(detectSource(url)).toBe(expected);

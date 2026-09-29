@@ -1,60 +1,32 @@
 import { createRelayPill } from '@/content/relay-pill';
 import { extractConversation } from '@/adapters/extract';
 import { injectPrompt } from '@/adapters/inject';
-import { getPlatformId } from '@/platform/registry';
+import { detectSource } from '@/platform/detect';
 import { onDomChange } from '@/shared/dom';
 import type { RuntimeMessage } from '@/shared/messaging';
 import type { Source } from '@/shared/schema';
-import { createRateLimitDetector, detectPlatformFromURL } from '@/platform/rate-limit-detection';
+import { createRateLimitDetector } from '@/platform/rate-limit-detection';
 import type { AIPlatform } from '@/platform/rate-limit-detection';
+
+// Canonical platform detection (same function the popup and side panel use).
+const source: Source = detectSource(location.href);
 
 let cleanupRateLimit: (() => void) | null = null;
 let pillMounted = false;
 
-function mountPill(): void {
-  if (pillMounted) return;
-  try {
-    createRelayPill();
-    pillMounted = true;
-  } catch {
-  }
-}
-
-function startRateLimitMonitoring(): void {
-  if (cleanupRateLimit) return;
-
-  const platform = detectPlatformFromURL();
-  if (!platform) return;
-
-  cleanupRateLimit = createRateLimitDetector({
-    platform: platform as AIPlatform,
-    onRateLimit(detection) {
-      chrome.runtime.sendMessage({
-        type: 'CIRA/RATE_LIMIT_DETECTED',
-        source: detection.platform as Source,
-        timestamp: Date.now(),
-      } satisfies RuntimeMessage).catch(() => { });
-    },
-    debounceMs: 5000,
-  });
-}
-
-mountPill();
-onDomChange(() => {
-  mountPill();
-}, 500);
-
-startRateLimitMonitoring();
-
+// 1. Messaging FIRST. Optional features below must never be able to stop the
+//    extension from reaching this tab (Phase 01 bug: an exception during
+//    start-up left the side panel with "Reload this tab to activate CIRA.").
 chrome.runtime.onMessage.addListener((msg: RuntimeMessage, _sender, sendResponse) => {
   switch (msg.type) {
     case 'CIRA/EXTRACT_REQUEST': {
-      void extractConversation().then((conversation) => {
-        sendResponse({
-          type: 'CIRA/EXTRACT_RESPONSE',
-          conversation,
-        } satisfies RuntimeMessage);
-      });
+      extractConversation().then(
+        (conversation) => sendResponse({ type: 'CIRA/EXTRACT_RESPONSE', conversation } satisfies RuntimeMessage),
+        (err: unknown) => {
+          console.error('[CIRA][content] extraction failed', err);
+          sendResponse({ type: 'CIRA/EXTRACT_ERROR', error: err instanceof Error ? err.message : String(err) } satisfies RuntimeMessage);
+        },
+      );
       return true;
     }
 
@@ -64,7 +36,8 @@ chrome.runtime.onMessage.addListener((msg: RuntimeMessage, _sender, sendResponse
     }
 
     case 'CIRA/PING': {
-      sendResponse({ type: 'CIRA/PONG' } satisfies RuntimeMessage);
+      // Handshake used by the side panel / popup to confirm this script is live.
+      sendResponse({ type: 'CIRA/PONG', source } satisfies RuntimeMessage);
       return false;
     }
 
@@ -77,6 +50,45 @@ chrome.runtime.onMessage.addListener((msg: RuntimeMessage, _sender, sendResponse
       return false;
   }
 });
+
+// 2. Optional features, each isolated.
+function mountPill(): void {
+  if (pillMounted) return;
+  try {
+    createRelayPill();
+    pillMounted = true;
+  } catch (err) {
+    console.error('[CIRA][content] relay pill failed to mount', err);
+  }
+}
+
+function startRateLimitMonitoring(): void {
+  if (cleanupRateLimit || source === 'unknown') return;
+  try {
+    cleanupRateLimit = createRateLimitDetector({
+      platform: source as AIPlatform,
+      onRateLimit(detection) {
+        chrome.runtime.sendMessage({
+          type: 'CIRA/RATE_LIMIT_DETECTED',
+          source: detection.platform as Source,
+          timestamp: Date.now(),
+        } satisfies RuntimeMessage).catch(() => { });
+      },
+      debounceMs: 5000,
+    });
+  } catch (err) {
+    console.error('[CIRA][content] rate-limit monitoring failed to start', err);
+  }
+}
+
+mountPill();
+onDomChange(() => {
+  mountPill();
+}, 500);
+startRateLimitMonitoring();
+
+// Hidden unless DevTools "Verbose" level is enabled.
+console.debug(`[CIRA][content] initialized ┬╖ source detected: ${source}`);
 
 async function handlePopStaged(for_: string): Promise<boolean> {
   const reply = (await chrome.runtime.sendMessage({
@@ -127,7 +139,7 @@ function showBanner(text: string, level: 'info' | 'warn' | 'error' = 'info'): vo
 }
 
 window.setTimeout(() => {
-  const currentPlatform = getPlatformId();
+  const currentPlatform = source;
   if (currentPlatform !== 'unknown') {
     void (async () => {
       const reply = (await chrome.runtime.sendMessage({

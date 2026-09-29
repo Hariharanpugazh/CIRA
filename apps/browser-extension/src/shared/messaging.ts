@@ -3,11 +3,12 @@ import type { Conversation, RelayPayload } from '@/shared/schema';
 export type RuntimeMessage =
   | { type: 'CIRA/EXTRACT_REQUEST' }
   | { type: 'CIRA/EXTRACT_RESPONSE'; conversation: Conversation }
+  | { type: 'CIRA/EXTRACT_ERROR'; error: string }
   | { type: 'CIRA/STAGE_RELAY'; payload: RelayPayload; target: string }
   | { type: 'CIRA/POP_STAGED'; for: string }
   | { type: 'CIRA/POP_STAGED_RESPONSE'; payload: RelayPayload | null }
   | { type: 'CIRA/PING' }
-  | { type: 'CIRA/PONG' }
+  | { type: 'CIRA/PONG'; source?: string }
   | { type: 'CIRA/LIVE_SNAPSHOT'; conversation: Conversation; summary: string }
   | { type: 'CIRA/LIVE_DELTA'; source: string; url: string; newMessages: Array<{ role: string; content: string }> }
   | { type: 'CIRA/RATE_LIMIT_DETECTED'; source: string; timestamp: number; url?: string }

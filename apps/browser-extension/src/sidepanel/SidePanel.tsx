@@ -9,6 +9,7 @@ import { timeAgo } from '@/shared/utils';
 import { detectSource } from '@/platform/detect';
 import { getAllPlatforms } from '@/platform/registry';
 import { describeSaveResult, saveContext } from '@/shared/context-client';
+import { chromeTabApi, extractFromTab, NOT_CONNECTED_MESSAGE, waitForConnection } from '@/shared/tab-connection';
 import { PlatformAvatar } from '@/components/brand-icons';
 import { Logo } from '@/components/Logo';
 
@@ -115,40 +116,16 @@ export function SidePanel() {
 
   const capture = async () => {
     if (!tabId) return;
-    setCapturing(true); setBanner('');
-    try {
-      const reply = await chrome.tabs.sendMessage(tabId, { type: 'CIRA/EXTRACT_REQUEST' } as RuntimeMessage) as RuntimeMessage | undefined;
-      if (reply && reply.type === 'CIRA/EXTRACT_RESPONSE') {
-        setConv(reply.conversation);
-        setBanner(`${reply.conversation.messages.length} messages captured`);
-        chrome.storage.session.set({ [`cira.captured.tab.${tabId}`]: true });
-        persistPco(reply.conversation);
-        setCapturing(false);
-        return;
-      }
-    } catch {
-      // Content script may not be loaded yet; fall through to inject.
+    setCapturing(true); setBanner('Reading chat...');
+    const r = await extractFromTab(chromeTabApi, tabId);
+    if (r.ok) {
+      setConv(r.conversation);
+      setBanner(`${r.conversation.messages.length} messages captured`);
+      chrome.storage.session.set({ [`cira.captured.tab.${tabId}`]: true });
+      persistPco(r.conversation);
+    } else {
+      setBanner(r.message);
     }
-    try {
-      const manifest = chrome.runtime.getManifest();
-      const jsFile = manifest.content_scripts?.[0]?.js?.[0];
-      if (jsFile) {
-        await chrome.scripting.executeScript({ target: { tabId }, files: [jsFile] });
-        await new Promise((r) => setTimeout(r, 350));
-        const retry = await chrome.tabs.sendMessage(tabId, { type: 'CIRA/EXTRACT_REQUEST' } as RuntimeMessage) as RuntimeMessage | undefined;
-        if (retry && retry.type === 'CIRA/EXTRACT_RESPONSE') {
-          setConv(retry.conversation);
-          setBanner(`${retry.conversation.messages.length} messages captured`);
-          chrome.storage.session.set({ [`cira.captured.tab.${tabId}`]: true });
-          persistPco(retry.conversation);
-          setCapturing(false);
-          return;
-        }
-      }
-    } catch {
-      // Fall through to user-visible failure.
-    }
-    setBanner('Reload this tab to activate CIRA.');
     setCapturing(false);
   };
 
@@ -156,7 +133,18 @@ export function SidePanel() {
     if (!tabId) return;
     setBanner('Reloading...');
     await chrome.tabs.reload(tabId);
-    await new Promise((r) => setTimeout(r, 2000));
+    // Wait for the page to finish loading and the content script to answer,
+    // instead of a fixed delay.
+    for (let i = 0; i < 60; i++) {
+      await new Promise((r) => setTimeout(r, 250));
+      const tab = await chrome.tabs.get(tabId).catch(() => null);
+      if (tab?.status === 'complete') break;
+    }
+    const conn = await waitForConnection(chromeTabApi, tabId);
+    if (conn.status !== 'connected') {
+      setBanner(NOT_CONNECTED_MESSAGE);
+      return;
+    }
     void capture();
   };
 

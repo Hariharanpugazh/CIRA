@@ -3,6 +3,7 @@ import type { Conversation, Source } from '@/shared/schema';
 import type { RuntimeMessage, RelayStats } from '@/shared/messaging';
 import { scanForSecrets, generateWarnings, type PCODocument } from '@cira/core';
 import { describeSaveResult, saveContext } from '@/shared/context-client';
+import { chromeTabApi, extractFromTab } from '@/shared/tab-connection';
 import { buildRelaySummary } from '@/shared/relay';
 import { countTokens } from '@/lib/tokens';
 import { db, type ConversationRecord, type TemplateRecord } from '@/storage/db';
@@ -91,31 +92,14 @@ export function Popup() {
       setStatusLoading(true);
       setStatusError(false);
 
-      chrome.tabs.sendMessage(tabId, { type: 'CIRA/EXTRACT_REQUEST' } satisfies RuntimeMessage)
-        .then((reply: RuntimeMessage | undefined) => {
-          if (reply && reply.type === 'CIRA/EXTRACT_RESPONSE') {
-            processConversation(reply.conversation);
+      extractFromTab(chromeTabApi, tabId)
+        .then((r) => {
+          if (r.ok) {
+            processConversation(r.conversation);
           } else {
-            setStatusText('Click Capture to extract the conversation.');
+            setStatusText(r.message);
             setStatusError(true);
           }
-        })
-        .catch(async () => {
-          try {
-            const manifest = chrome.runtime.getManifest();
-            const jsFile = manifest.content_scripts?.[0]?.js?.[0];
-            if (jsFile) {
-              await chrome.scripting.executeScript({ target: { tabId }, files: [jsFile] });
-              await new Promise((r) => setTimeout(r, 300));
-              const retry = await chrome.tabs.sendMessage(tabId, { type: 'CIRA/EXTRACT_REQUEST' } satisfies RuntimeMessage) as RuntimeMessage | undefined;
-              if (retry && retry.type === 'CIRA/EXTRACT_RESPONSE') {
-                processConversation(retry.conversation);
-                return;
-              }
-            }
-          } catch {}
-          setStatusText('Click Capture to begin.');
-          setStatusError(true);
         })
         .finally(() => {
           setCapturing(false);
@@ -286,10 +270,9 @@ export function Popup() {
             {source !== 'unknown' && (
               <Button variant="secondary" disabled={capturing} onClick={() => {
                 setCapturing(true); setStatusText('Reading...'); setStatusLoading(true);
-                if (!tabId) return;
-                chrome.tabs.sendMessage(tabId, { type: 'CIRA/EXTRACT_REQUEST' } satisfies RuntimeMessage)
-                  .then((reply) => { if (reply && reply.type === 'CIRA/EXTRACT_RESPONSE') processConversation(reply.conversation); })
-                  .catch(() => setStatusText('Refresh this tab to activate CIRA.'))
+                if (!tabId) { setCapturing(false); setStatusLoading(false); return; }
+                extractFromTab(chromeTabApi, tabId)
+                  .then((r) => { if (r.ok) processConversation(r.conversation); else { setStatusText(r.message); setStatusError(true); } })
                   .finally(() => { setCapturing(false); setStatusLoading(false); });
               }} size="sm" className="w-full">
                 {capturing ? 'Capturing...' : 'Capture Conversation'}

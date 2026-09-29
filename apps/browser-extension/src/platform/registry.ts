@@ -1,4 +1,5 @@
 import type { Source } from '@/shared/schema';
+import { detectSource } from './detect';
 
 export interface PlatformDef {
   id: Source;
@@ -453,19 +454,12 @@ const PLATFORMS: PlatformDef[] = [
   },
 ];
 
+/**
+ * Platform of the current page. Delegates to the canonical `detectSource()`
+ * so the content script, popup and side panel can never disagree.
+ */
 export function getPlatformId(): Source {
-  const url = location.href;
-  let best: PlatformDef | null = null;
-  let bestScore = 0;
-  for (const p of PLATFORMS) {
-    if (p.id === 'unknown') continue;
-    const score = p.matchScore(url);
-    if (score > 0 && score > bestScore) {
-      bestScore = score;
-      best = p;
-    }
-  }
-  return best?.id ?? 'unknown';
+  return detectSource(location.href);
 }
 
 export function getPlatformDef(id: string): PlatformDef | undefined {

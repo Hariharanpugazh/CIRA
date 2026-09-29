@@ -223,7 +223,20 @@ const PLATFORM_BRAND: Record<string, PlatformBrand> = {
   unknown: { name: 'Unknown', initial: '?', color: '#7d7d7d' },
 };
 
-class CiraRelayPill extends HTMLElement {
+/**
+ * The pill UI lives in a shadow root attached to a plain host element.
+ *
+ * It must NOT be a registered custom element: in Chrome's isolated
+ * content-script world `window.customElements` is null, so
+ * `customElements.define()` throws at import time. That exception used to
+ * abort the whole content script before its message listener was
+ * registered, which is why "Read chat" reported "Reload this tab to
+ * activate CIRA." `attachShadow()` works on any element with a valid
+ * custom-element name, registered or not.
+ */
+class CiraRelayPill {
+  readonly host: HTMLElement;
+  private readonly shadow: ShadowRoot;
   private _wrap: HTMLElement | null = null;
   private _label: HTMLElement | null = null;
   private _menu: HTMLElement | null = null;
@@ -235,17 +248,17 @@ class CiraRelayPill extends HTMLElement {
   private _menuOpen = false;
   private _busy: 'extract' | 'send' | null = null;
 
-  constructor() {
-    super();
-    const shadow = this.attachShadow({ mode: 'open' });
-    shadow.appendChild(PILL_TEMPLATE.content.cloneNode(true));
+  constructor(host: HTMLElement) {
+    this.host = host;
+    this.shadow = host.attachShadow({ mode: 'open' });
+    this.shadow.appendChild(PILL_TEMPLATE.content.cloneNode(true));
     this._pos = this._defaultPos();
   }
 
-  async connectedCallback() {
-    this._wrap = this.shadowRoot!.querySelector('.pill-wrap')!;
-    this._label = this.shadowRoot!.querySelector('.pill-label')!;
-    this._menu = this.shadowRoot!.querySelector('.menu')!;
+  async mount() {
+    this._wrap = this.shadow.querySelector('.pill-wrap')!;
+    this._label = this.shadow.querySelector('.pill-label')!;
+    this._menu = this.shadow.querySelector('.menu')!;
     await this._loadPosition();
     this._positionPill();
     this._bindEvents();
@@ -284,7 +297,7 @@ class CiraRelayPill extends HTMLElement {
   }
 
   private _positionPill() {
-    const style = this.style;
+    const style = this.host.style;
     style.left = 'auto';
     style.right = 'auto';
     style.top = 'auto';
@@ -357,7 +370,7 @@ class CiraRelayPill extends HTMLElement {
     document.addEventListener('click', (e: Event) => {
       if (!this._menuOpen) return;
       const path = e.composedPath();
-      if (path.includes(this)) return;
+      if (path.includes(this.host)) return;
       this._closeMenu();
     });
 
@@ -562,15 +575,13 @@ class CiraRelayPill extends HTMLElement {
   }
 }
 
-if (!customElements.get('cira-relay-pill')) {
-  customElements.define('cira-relay-pill', CiraRelayPill);
-}
+const PILL_HOST_TAG = 'cira-relay-pill';
 
 export function createRelayPill(): HTMLElement {
-  let el = document.querySelector('cira-relay-pill') as HTMLElement | null;
-  if (!el) {
-    el = document.createElement('cira-relay-pill') as HTMLElement;
-    document.body.appendChild(el);
-  }
-  return el;
+  const existing = document.querySelector<HTMLElement>(PILL_HOST_TAG);
+  if (existing) return existing;
+  const host = document.createElement(PILL_HOST_TAG);
+  document.body.appendChild(host);
+  void new CiraRelayPill(host).mount();
+  return host;
 }
