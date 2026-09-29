@@ -1,0 +1,7 @@
+{
+  "extends": "./tsconfig.app.json",
+  "compilerOptions": {
+    "types": ["chrome", "vite/client", "node"]
+  },
+  "include": ["src", "tests", "vitest.config.ts"]
+}

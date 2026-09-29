@@ -1,0 +1,20 @@
+{
+  "source": "gemini",
+  "title": "Project rules",
+  "url": "https://gemini.google.com/app/3333333333333333",
+  "capturedAt": "2026-09-22T12:00:00.000Z",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Rules for this project:\n- Never commit secrets to the repository.\n- The app must work offline.\n- You should prefer small pull requests.\n- Don't use class components in React.\n- Code should not depend on browser globals."
+    },
+    {
+      "role": "assistant",
+      "content": "Got it, I will follow these rules."
+    },
+    {
+      "role": "user",
+      "content": "I don't know if we need TypeScript strict mode."
+    }
+  ]
+}

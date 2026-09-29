@@ -1,0 +1,9 @@
+{
+  // The explicitly isolated Node subpath (`@cira/core/node`).
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2022"],
+    "types": ["node"]
+  },
+  "include": ["src/node"]
+}

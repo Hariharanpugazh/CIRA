@@ -1,0 +1,20 @@
+{
+  "source": "deepseek",
+  "title": "Database choice",
+  "url": "https://chat.deepseek.com/a/chat/s/44444444-4444-4444-8444-444444444444",
+  "capturedAt": "2026-09-23T15:45:00.000Z",
+  "messages": [
+    {
+      "role": "user",
+      "content": "We need to pick a database. Options are Postgres and MongoDB."
+    },
+    {
+      "role": "assistant",
+      "content": "For relational data with strong consistency, Postgres is the better fit."
+    },
+    {
+      "role": "user",
+      "content": "Agreed. We've decided to use Postgres. We will use Prisma as the ORM. We chose pnpm for package management."
+    }
+  ]
+}

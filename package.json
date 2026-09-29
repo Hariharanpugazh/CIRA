@@ -1,53 +1,30 @@
 {
-  "name": "cira",
+  "name": "cira-workspace",
   "private": true,
   "version": "0.1.0",
-  "description": "Context Intelligent Relay Assistant — carry context between ChatGPT, Claude, Gemini, and 12 other AI platforms.",
+  "description": "CIRA — a user-owned, model-independent AI context layer.",
+  "license": "Apache-2.0",
   "type": "module",
-  "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
-    "preview": "vite preview",
-    "typecheck": "tsc -b --noEmit",
-    "icons": "node scripts/make-icons.mjs"
+  "packageManager": "pnpm@10.19.0",
+  "engines": {
+    "node": ">=22.12"
   },
-  "dependencies": {
-    "@base-ui/react": "^1.5.0",
-    "@fontsource-variable/geist": "^5.2.9",
-    "@lobehub/icons-static-svg": "1.91.0",
-    "@radix-ui/react-slot": "^1.2.4",
-    "@radix-ui/react-tabs": "^1.1.13",
-    "class-variance-authority": "^0.7.1",
-    "clsx": "^2.1.1",
-    "dexie": "^4.0.8",
-    "diff-match-patch": "^1.0.5",
-    "flexsearch": "^0.7.43",
-    "gpt-tokenizer": "^2.5.0",
-    "jszip": "^3.10.1",
-    "lucide-react": "^1.17.0",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "shadcn": "^4.8.2",
-    "simple-icons": "13.21.0",
-    "tailwind-merge": "^3.6.0",
-    "tw-animate-css": "^1.4.0",
-    "uplot": "^1.6.31"
+  "scripts": {
+    "build": "pnpm -r --workspace-concurrency=1 run build",
+    "typecheck": "pnpm -r run typecheck",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "dev:extension": "pnpm --filter @cira/browser-extension dev",
+    "build:extension": "pnpm --filter @cira/browser-extension build",
+    "cira": "node cli/dist/cira.js",
+    "mcp": "node packages/mcp/dist/server.js",
+    "generate:schema": "pnpm --filter @cira/pco generate",
+    "smoke": "node scripts/smoke-e2e.mjs"
   },
   "devDependencies": {
-    "@crxjs/vite-plugin": "^2.4.0",
-    "@types/chrome": "^0.0.270",
-    "@types/diff-match-patch": "^1.0.36",
-    "@types/node": "^25.9.1",
-    "@types/react": "^18.3.3",
-    "@types/react-dom": "^18.3.0",
-    "@vitejs/plugin-react": "^4.3.1",
-    "autoprefixer": "^10.4.19",
-    "postcss": "^8.4.39",
-    "tailwindcss": "^3.4.6",
-    "typescript": "^5.5.3",
-    "vite": "^5.3.4"
-  },
-  "optionalDependencies": {
-    "sharp": "^0.34.5"
+    "@types/node": "25.9.1",
+    "typescript": "5.9.3",
+    "vite": "^7.3.6",
+    "vitest": "5.0.2"
   }
 }

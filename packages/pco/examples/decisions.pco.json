@@ -1,0 +1,151 @@
+{
+  "pco_version": "0.1",
+  "id": "pco_547cb2eb46a9f663",
+  "metadata": {
+    "created_at": "2026-09-29T12:00:00.000Z",
+    "updated_at": "2026-09-29T12:00:00.000Z",
+    "created_by": {
+      "agent": "cira-examples"
+    },
+    "title": "Database choice"
+  },
+  "conversations": [
+    {
+      "id": "conv_48993040d72c003e",
+      "source": {
+        "kind": "browser",
+        "platform": "deepseek",
+        "client": "cira-examples"
+      },
+      "captured_at": "2026-09-23T15:45:00.000Z",
+      "turns": [
+        {
+          "id": "conv_48993040d72c003e_t0",
+          "index": 0,
+          "role": "user",
+          "content": "We need to pick a database. Options are Postgres and MongoDB."
+        },
+        {
+          "id": "conv_48993040d72c003e_t1",
+          "index": 1,
+          "role": "assistant",
+          "content": "For relational data with strong consistency, Postgres is the better fit."
+        },
+        {
+          "id": "conv_48993040d72c003e_t2",
+          "index": 2,
+          "role": "user",
+          "content": "Agreed. We've decided to use Postgres. We will use Prisma as the ORM. We chose pnpm for package management."
+        }
+      ],
+      "title": "Database choice",
+      "url": "https://chat.deepseek.com/a/chat/s/44444444-4444-4444-8444-444444444444"
+    }
+  ],
+  "items": [
+    {
+      "type": "task",
+      "status": "open",
+      "content": "We need to pick a database.",
+      "confidence": 0.5,
+      "id": "itm_1e021de951c46765",
+      "provenance": {
+        "source": {
+          "kind": "browser",
+          "platform": "deepseek",
+          "client": "cira-examples"
+        },
+        "conversation_id": "conv_48993040d72c003e",
+        "captured_at": "2026-09-23T15:45:00.000Z",
+        "extracted_by": {
+          "method": "heuristic",
+          "agent": "cira.heuristic-statements@0.1.0"
+        },
+        "turn_id": "conv_48993040d72c003e_t0",
+        "span": {
+          "start": 0,
+          "end": 27
+        }
+      },
+      "created_at": "2026-09-29T12:00:00.000Z"
+    },
+    {
+      "type": "decision",
+      "status": "accepted",
+      "content": "We've decided to use Postgres.",
+      "confidence": 0.65,
+      "id": "itm_6565db0add62d335",
+      "provenance": {
+        "source": {
+          "kind": "browser",
+          "platform": "deepseek",
+          "client": "cira-examples"
+        },
+        "conversation_id": "conv_48993040d72c003e",
+        "captured_at": "2026-09-23T15:45:00.000Z",
+        "extracted_by": {
+          "method": "heuristic",
+          "agent": "cira.heuristic-statements@0.1.0"
+        },
+        "turn_id": "conv_48993040d72c003e_t2",
+        "span": {
+          "start": 8,
+          "end": 38
+        }
+      },
+      "created_at": "2026-09-29T12:00:00.000Z"
+    },
+    {
+      "type": "decision",
+      "status": "accepted",
+      "content": "We will use Prisma as the ORM.",
+      "confidence": 0.65,
+      "id": "itm_ba1734883e8e3e64",
+      "provenance": {
+        "source": {
+          "kind": "browser",
+          "platform": "deepseek",
+          "client": "cira-examples"
+        },
+        "conversation_id": "conv_48993040d72c003e",
+        "captured_at": "2026-09-23T15:45:00.000Z",
+        "extracted_by": {
+          "method": "heuristic",
+          "agent": "cira.heuristic-statements@0.1.0"
+        },
+        "turn_id": "conv_48993040d72c003e_t2",
+        "span": {
+          "start": 39,
+          "end": 69
+        }
+      },
+      "created_at": "2026-09-29T12:00:00.000Z"
+    },
+    {
+      "type": "decision",
+      "status": "accepted",
+      "content": "We chose pnpm for package management.",
+      "confidence": 0.65,
+      "id": "itm_68f8e57caca0e705",
+      "provenance": {
+        "source": {
+          "kind": "browser",
+          "platform": "deepseek",
+          "client": "cira-examples"
+        },
+        "conversation_id": "conv_48993040d72c003e",
+        "captured_at": "2026-09-23T15:45:00.000Z",
+        "extracted_by": {
+          "method": "heuristic",
+          "agent": "cira.heuristic-statements@0.1.0"
+        },
+        "turn_id": "conv_48993040d72c003e_t2",
+        "span": {
+          "start": 70,
+          "end": 107
+        }
+      },
+      "created_at": "2026-09-29T12:00:00.000Z"
+    }
+  ]
+}

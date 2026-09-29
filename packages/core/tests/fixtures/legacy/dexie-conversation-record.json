@@ -1,0 +1,27 @@
+{
+  "id": 3,
+  "source": "claude",
+  "platform": "claude",
+  "title": "Rate limit handling",
+  "url": "https://claude.ai/chat/66666666-6666-4666-8666-666666666666",
+  "capturedAt": "2026-09-26T07:00:00.000Z",
+  "messageCount": 2,
+  "messages": [
+    {
+      "role": "user",
+      "content": "The client must retry on HTTP 429. Should we use exponential backoff?"
+    },
+    {
+      "role": "assistant",
+      "content": "Yes. We'll use exponential backoff with jitter.",
+      "codeBlocks": [
+        {
+          "language": "ts",
+          "code": "const delay = Math.min(30_000, 2 ** attempt * 1000) * Math.random();"
+        }
+      ]
+    }
+  ],
+  "tags": [],
+  "archived": false
+}

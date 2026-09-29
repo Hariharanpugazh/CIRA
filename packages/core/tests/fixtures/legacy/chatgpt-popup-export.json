@@ -1,0 +1,35 @@
+{
+  "source": "chatgpt",
+  "title": "Vite + React extension setup",
+  "url": "https://chatgpt.com/c/68d1f0a2-7b3c-8004-9d2e-0a1b2c3d4e5f",
+  "capturedAt": "2026-09-25T18:02:11.482Z",
+  "messages": [
+    {
+      "role": "user",
+      "content": "I'm building a Chrome extension with Vite and React. Do not use webpack. How do I add a side panel?"
+    },
+    {
+      "role": "assistant",
+      "content": "Add a `side_panel` entry to your manifest and point it at an HTML page:\n\n```json\n{\n  \"side_panel\": { \"default_path\": \"src/sidepanel/index.html\" }\n}\n```\n\nThen call `chrome.sidePanel.setPanelBehavior` from the service worker. Docs: https://developer.chrome.com/docs/extensions/reference/api/sidePanel",
+      "code": [
+        {
+          "language": "ts",
+          "code": "chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });"
+        }
+      ],
+      "attachments": [
+        {
+          "url": "https://files.oaiusercontent.com/file-abc123/diagram.png",
+          "type": "image",
+          "name": "diagram.png",
+          "mimeType": "image/png",
+          "dataUrl": "data:image/png;base64,iVBORw0KGgo="
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "We decided to keep the popup as well. Next step: wire the side panel to the capture flow."
+    }
+  ]
+}

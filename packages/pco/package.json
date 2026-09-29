@@ -1,0 +1,27 @@
+{
+  "name": "@cira/pco",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Portable Context Object (PCO) specification artifacts: JSON Schema and canonical examples, generated from @cira/core.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "exports": {
+    "./schema/pco-0.1.schema.json": "./schema/pco-0.1.schema.json",
+    "./examples/*": "./examples/*"
+  },
+  "files": [
+    "schema",
+    "examples",
+    "README.md"
+  ],
+  "scripts": {
+    "generate": "tsx scripts/generate.ts",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "devDependencies": {
+    "@cira/core": "workspace:*",
+    "ajv": "8.20.0",
+    "tsx": "4.23.15",
+    "zod": "4.6.5"
+  }
+}

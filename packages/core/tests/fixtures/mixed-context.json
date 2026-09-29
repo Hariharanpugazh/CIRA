@@ -1,0 +1,20 @@
+{
+  "source": "perplexity",
+  "title": "Note-taking app sync",
+  "url": "https://www.perplexity.ai/search/note-sync-5555",
+  "capturedAt": "2026-09-24T09:15:00.000Z",
+  "messages": [
+    {
+      "role": "user",
+      "content": "I'm working on a note-taking app. I'd rather keep the UI minimal. The app must support Markdown. What's the best way to sync notes between devices?"
+    },
+    {
+      "role": "assistant",
+      "content": "You could use CRDTs. See [Automerge](https://automerge.org/) and https://crdt.tech for background.\n\n```js\nconst doc = Automerge.init();\n```"
+    },
+    {
+      "role": "user",
+      "content": "Let's use Automerge. Please implement a sync prototype. Avoid any paid services."
+    }
+  ]
+}
