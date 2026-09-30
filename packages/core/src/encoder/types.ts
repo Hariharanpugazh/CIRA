@@ -16,6 +16,13 @@ export interface TurnInput {
   content: string;
   timestamp?: string;
   attachments?: Attachment[];
+  /**
+   * Position of this turn in the source conversation. Defaults to its position
+   * in `turns`. Set it when encoding a subset of a conversation (e.g. messages
+   * the user selected) so turn IDs and provenance keep pointing at the
+   * original message numbers. Must be unique within the conversation.
+   */
+  index?: number;
 }
 
 export interface ConversationInput {

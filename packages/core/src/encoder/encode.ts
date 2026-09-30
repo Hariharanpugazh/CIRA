@@ -79,7 +79,8 @@ export function buildConversation(input: ConversationInput): PcoConversation {
     id,
     source: { ...input.source },
     captured_at: input.captured_at,
-    turns: input.turns.map((t, index): Turn => {
+    turns: input.turns.map((t, position): Turn => {
+      const index = t.index ?? position;
       const turn: Turn = { id: `${id}_t${index}`, index, role: t.role, content: t.content };
       if (t.timestamp) turn.timestamp = t.timestamp;
       if (t.attachments?.length) turn.attachments = t.attachments.map((a) => ({ ...a }));

@@ -1,316 +1,214 @@
-import { useState, useEffect, useCallback } from 'react';
-import type { Conversation, Source } from '@/shared/schema';
-import type { RuntimeMessage, RelayStats } from '@/shared/messaging';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { TARGET_URLS } from '@/platform/urls';
-import { timeAgo } from '@/shared/utils';
-import { detectSource } from '@/platform/detect';
-import { getAllPlatforms } from '@/platform/registry';
-import { describeSaveResult, saveContext } from '@/shared/context-client';
-import { chromeTabApi, extractFromTab, NOT_CONNECTED_MESSAGE, waitForConnection } from '@/shared/tab-connection';
-import { PlatformAvatar } from '@/components/brand-icons';
-import { Logo } from '@/components/Logo';
-
-interface LiveContext {
-  conversation: Conversation;
-  summary: string;
-}
-
-interface PlatformBrand { name: string; initial: string; color: string }
-
-const PLATFORM_BRAND: Record<string, PlatformBrand> = {
-  chatgpt: { name: 'ChatGPT', initial: 'G', color: '#10a37f' },
-  claude: { name: 'Claude', initial: 'C', color: '#d97757' },
-  gemini: { name: 'Gemini', initial: 'G', color: '#4285f4' },
-  deepseek: { name: 'DeepSeek', initial: 'D', color: '#4d6bfe' },
-  perplexity: { name: 'Perplexity', initial: 'P', color: '#20808d' },
-  copilot: { name: 'Copilot', initial: 'M', color: '#0a6cff' },
-  grok: { name: 'Grok', initial: 'X', color: '#1d9bf0' },
-  mistral: { name: 'Mistral', initial: 'M', color: '#fa520f' },
-  qwen: { name: 'Qwen', initial: 'Q', color: '#615ced' },
-  poe: { name: 'Poe', initial: 'P', color: '#5d3fd3' },
-  kimi: { name: 'Kimi', initial: 'K', color: '#6c5ce7' },
-  huggingchat: { name: 'HuggingChat', initial: 'H', color: '#ff9d00' },
-  notebooklm: { name: 'NotebookLM', initial: 'N', color: '#1a73e8' },
-  you: { name: 'You.com', initial: 'Y', color: '#7c3aed' },
-  characterai: { name: 'Character.AI', initial: 'A', color: '#5b6ee1' },
-  pi: { name: 'Pi', initial: '\u03C0', color: '#a78bfa' },
-  zai: { name: 'Z.ai', initial: 'Z', color: '#2d9cdb' },
-  unknown: { name: 'this chat', initial: '?', color: '#7d7d7d' },
-};
-
-function brandFor(source: string): PlatformBrand {
-  return PLATFORM_BRAND[source] ?? PLATFORM_BRAND.unknown;
-}
-
-const FONT_STACK = "'Poppins', ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif";
+/**
+ * CIRA side panel: a context workspace.
+ *
+ *   Read chat → 1. Select messages → 2. Review extracted context → 3. Save and/or send
+ *
+ * Nothing is saved or sent until the user confirms on the Send step. State
+ * lives in ./state/workspace.ts (pure reducer) and ./hooks/useWorkspace.ts
+ * (Chrome wiring).
+ */
+import { useMemo, type ReactNode } from 'react';
+import { scanDocument } from '@cira/core';
+import { describeSync } from '@/shared/context-client';
+import { buildPcoHandoff, estimateTokens } from '@/shared/context-selection';
+import { brandFor, relayTargets } from './brands';
+import { ActiveContextCard } from './components/ActiveContextCard';
+import { ContextReview } from './components/ContextReview';
+import { ContextSummary } from './components/ContextSummary';
+import { ConversationHeader } from './components/ConversationHeader';
+import { EmptyState } from './components/EmptyState';
+import { Header } from './components/Header';
+import { ChevronLeftIcon, RefreshIcon, SaveIcon, SendIcon } from './components/icons';
+import { LoadingState } from './components/LoadingState';
+import { MessageSelector } from './components/MessageSelector';
+import { StatusBanner } from './components/StatusBanner';
+import { StepIndicator } from './components/StepIndicator';
+import { TargetSelector } from './components/TargetSelector';
+import { useWorkspace } from './hooks/useWorkspace';
+import { selectedItemIds } from './state/workspace';
 
 export function SidePanel() {
-  const [source, setSource] = useState<string>('unknown');
-  const [tabId, setTabId] = useState<number | null>(null);
-  const [conv, setConv] = useState<Conversation | null>(null);
-  const [liveCtx, setLiveCtx] = useState<LiveContext | null>(null);
-  const [stats, setStats] = useState<RelayStats | null>(null);
-  const [capturing, setCapturing] = useState(false);
-  const [sending, setSending] = useState<string | null>(null);
-  const [banner, setBanner] = useState('');
-  const [recentConvs, setRecentConvs] = useState<Array<{ id: string; title: string; source: string; at: string; msgs: number }>>([]);
+  const { state, dispatch, tab, readChat, reloadTab, continueToReview, submit, retrySync, clearActive, editActive } = useWorkspace();
+  const { step, conversation, busy } = state;
+  const source = conversation?.source ?? tab.source;
+  const keptIds = useMemo(() => selectedItemIds(state), [state.draft, state.removedItems]);
 
-  const updateTab = useCallback(async () => {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (tab) { setSource(detectSource(tab.url)); setTabId(tab.id ?? null); }
-  }, []);
+  // Final context preview for the summary (only the kept items).
+  const final = useMemo(() => {
+    if (!state.draft) return null;
+    const keep = new Set(keptIds);
+    const doc = { ...state.draft, items: state.draft.items.filter((i) => keep.has(i.id)) };
+    const text = buildPcoHandoff(doc, { source: conversation?.source ?? 'unknown', title: conversation?.title });
+    const scan = scanDocument(doc);
+    return { doc, tokens: estimateTokens(text), warnings: scan.hasFindings ? scan.warnings : [] };
+  }, [state.draft, keptIds, conversation]);
 
-  const loadData = useCallback(async () => {
-    try {
-      const res = await chrome.runtime.sendMessage({ type: 'CIRA/GET_STATS' } as RuntimeMessage);
-      if (res && typeof res === 'object' && 'totalRelays' in (res as object)) setStats(res as RelayStats);
-    } catch {
-      // Service worker may be sleeping; try again on next event.
-    }
-    try {
-      const { ['cira.persist.conversations']: raw } = await chrome.storage.local.get('cira.persist.conversations');
-      if (raw) {
-        setRecentConvs(
-          (raw as Array<{ id: string; conversation: Conversation; savedAt: string }>)
-            .map((r) => ({ id: r.id, title: r.conversation.title, source: r.conversation.source, at: r.savedAt, msgs: r.conversation.messages.length }))
-            .slice(0, 10),
-        );
-      }
-    } catch {
-      // Nothing saved yet.
-    }
-    try {
-      const { ['cira.live.context']: ctx } = await chrome.storage.session.get('cira.live.context');
-      if (ctx) setLiveCtx(ctx as LiveContext);
-    } catch {
-      // Session storage may be empty.
-    }
-  }, []);
+  const targets = useMemo(() => relayTargets(source), [source]);
+  const canRead = tab.tabId !== null && tab.source !== 'unknown' && busy?.kind !== 'reading';
 
-  useEffect(() => {
-    void updateTab(); void loadData();
-    const onTab = () => { void updateTab(); void loadData(); };
-    chrome.tabs.onActivated.addListener(onTab);
-    chrome.tabs.onUpdated.addListener(onTab);
-    chrome.storage.onChanged.addListener((changes, area) => {
-      if (area === 'local' && (changes['cira.persist.conversations'] || changes['cira.persist.stats'])) void loadData();
-      if (area === 'session' && changes['cira.live.context']) {
-        setLiveCtx(changes['cira.live.context'].newValue as LiveContext | undefined ?? null);
-      }
-    });
-    return () => {
-      chrome.tabs.onActivated.removeListener(onTab);
-      chrome.tabs.onUpdated.removeListener(onTab);
-    };
-  }, [updateTab, loadData]);
-
-  const persistPco = (conversation: Conversation) => {
-    void saveContext(conversation).then((r) => {
-      const { text } = describeSaveResult(r);
-      setBanner(`${conversation.messages.length} messages captured · ${text}`);
-    });
-  };
-
-  const capture = async () => {
-    if (!tabId) return;
-    setCapturing(true); setBanner('Reading chat...');
-    const r = await extractFromTab(chromeTabApi, tabId);
-    if (r.ok) {
-      setConv(r.conversation);
-      setBanner(`${r.conversation.messages.length} messages captured`);
-      chrome.storage.session.set({ [`cira.captured.tab.${tabId}`]: true });
-      persistPco(r.conversation);
-    } else {
-      setBanner(r.message);
-    }
-    setCapturing(false);
-  };
-
-  const reloadAndCapture = async () => {
-    if (!tabId) return;
-    setBanner('Reloading...');
-    await chrome.tabs.reload(tabId);
-    // Wait for the page to finish loading and the content script to answer,
-    // instead of a fixed delay.
-    for (let i = 0; i < 60; i++) {
-      await new Promise((r) => setTimeout(r, 250));
-      const tab = await chrome.tabs.get(tabId).catch(() => null);
-      if (tab?.status === 'complete') break;
-    }
-    const conn = await waitForConnection(chromeTabApi, tabId);
-    if (conn.status !== 'connected') {
-      setBanner(NOT_CONNECTED_MESSAGE);
-      return;
-    }
-    void capture();
-  };
-
-  const relay = async (target: Source) => {
-    const payload = conv ?? liveCtx?.conversation;
-    if (!payload) return;
-    setSending(target);
-    try {
-      await chrome.runtime.sendMessage({
-        type: 'CIRA/STAGE_RELAY',
-        target,
-        payload: { conversation: payload, summary: liveCtx?.summary ?? '' },
-      } as RuntimeMessage);
-      setBanner(`Opening ${brandFor(target).name}...`);
-      window.open(TARGET_URLS[target] ?? `https://${target}.com`, '_blank');
-      window.setTimeout(() => { void loadData(); setSending(null); }, 1500);
-    } catch {
-      setBanner('Relay failed');
-      setSending(null);
-    }
-  };
-
-  const allTargets = getAllPlatforms()
-    .map((p) => p.id)
-    .filter((id) => id !== source && PLATFORM_BRAND[id]) as Source[];
-
-  const here = brandFor(source);
+  const menu = [
+    { label: conversation ? 'Read chat again' : 'Read chat', onSelect: () => void readChat(), disabled: !canRead },
+    { label: 'Reload tab', onSelect: () => void reloadTab(), disabled: tab.tabId === null },
+    ...(conversation ? [{ label: 'Start over', onSelect: () => dispatch({ type: 'reset' }) }] : []),
+  ];
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: 'var(--background)', color: 'var(--foreground)', fontFamily: FONT_STACK }}>
-      <header style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
-        <div style={{ width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 9, background: '#fff' }}>
-          <Logo size={20} />
-        </div>
-        <div>
-          <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: 0.01 }}>CIRA</div>
-          <div style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>Carry your chat anywhere</div>
-        </div>
-        {source !== 'unknown' && (
-          <Badge variant="secondary" style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 500, padding: '4px 10px', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-            <PlatformAvatar source={source} initial={here.initial} color={here.color} size={16} radius={5} />
-            {here.name}
-          </Badge>
-        )}
-      </header>
+    <div className="cp-app">
+      <Header source={tab.source} actions={menu} />
 
-      <div style={{ padding: '8px 16px', borderBottom: '1px solid var(--border)', display: 'flex', gap: 6, flexShrink: 0 }}>
-        <Button variant="secondary" size="sm" onClick={capture} disabled={capturing || source === 'unknown'}>
-          {capturing ? 'Reading...' : 'Read chat'}
-        </Button>
-        <Button variant="ghost" size="sm" onClick={reloadAndCapture} disabled={source === 'unknown'}>Reload tab</Button>
-      </div>
+      {conversation && <ConversationHeader title={conversation.title} source={conversation.source} messageCount={conversation.messages.length} step={step} />}
 
-      {banner && (
-        <div style={{ padding: '8px 16px', fontSize: 12, background: 'var(--secondary)', color: 'var(--muted-foreground)', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
-          {banner}
-        </div>
+      {state.active && step !== 'success' && (
+        <ActiveContextCard active={state.active} busy={!!busy} onEdit={editActive} onReplace={() => void readChat()} onClear={() => void clearActive()} />
       )}
 
-      <div style={{ flex: 1, overflowY: 'auto', padding: 12 }}>
-        {(conv || liveCtx?.conversation) && (
-          <Card style={{ marginBottom: 16 }}>
-            <CardContent style={{ padding: 14 }}>
-              <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--muted-foreground)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 8 }}>Active context</div>
-              <div style={{ fontWeight: 600, marginBottom: 4, fontSize: 13, lineHeight: 1.35 }}>{(conv ?? liveCtx?.conversation)!.title}</div>
-              <div style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>
-                {brandFor((conv ?? liveCtx?.conversation)!.source).name} · {(conv ?? liveCtx?.conversation)!.messages.length} messages
-              </div>
-            </CardContent>
-          </Card>
+      {step !== 'idle' && <StepIndicator step={step} />}
+
+      {state.error && (
+        <StatusBanner level="error" title={state.error} onDismiss={() => dispatch({ type: 'error/dismiss' })} />
+      )}
+
+      <main className="cp-main">
+        {step === 'idle' &&
+          (tab.source === 'unknown' ? (
+            <EmptyState title="No conversation detected" body="Open a supported AI conversation (ChatGPT, Claude, Gemini, …) and reload the tab." />
+          ) : (
+            <EmptyState title={`Carry context from ${brandFor(tab.source).name}`} body="Read the conversation, choose the messages that matter, review what CIRA extracted, then save or send it.">
+              <button type="button" className="cp-btn cp-btn--primary" onClick={() => void readChat()} disabled={!canRead}>
+                {busy?.kind === 'reading' ? 'Reading conversation…' : 'Read chat'}
+              </button>
+            </EmptyState>
+          ))}
+
+        {step === 'select' && <MessageSelector messages={state.messages} selected={state.selectedMessages} query={state.query} dispatch={dispatch} />}
+
+        {step === 'review' && state.draft && (
+          <ContextReview draft={state.draft} removed={state.removedItems} dispatch={dispatch}>
+            {final && conversation && (
+              <ContextSummary
+                messages={state.selectedMessages.size}
+                totalMessages={conversation.messages.length}
+                items={final.doc.items.length}
+                tokens={final.tokens}
+                source={conversation.source}
+                warnings={final.warnings}
+              />
+            )}
+          </ContextReview>
         )}
 
-        {(!conv && !liveCtx?.conversation) && (
-          <div style={{ textAlign: 'center', padding: '40px 16px', color: 'var(--muted-foreground)', fontSize: 12 }}>
-            <div style={{
-              width: 56, height: 56, borderRadius: 18, background: 'var(--card)', border: '1px solid var(--border)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px', color: '#10a37f',
-            }}>
-              <svg viewBox="0 0 24 24" width="26" height="26" fill="none" aria-hidden="true">
-                <path d="M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v8A2.5 2.5 0 0 1 17.5 17H10l-4 4v-4H6.5A2.5 2.5 0 0 1 4 14.5v-8z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
-              </svg>
-            </div>
-            {source === 'unknown'
-              ? <p>Open any AI chat tab to begin.</p>
-              : <p>Click <strong style={{ color: 'var(--foreground)' }}>Read chat</strong> to pull in the conversation, then send it anywhere.</p>}
-          </div>
+        {step === 'send' && (
+          <TargetSelector
+            targets={targets}
+            target={state.target}
+            saveLocally={state.saveLocally}
+            onTarget={(t) => dispatch({ type: 'target', target: t })}
+            onSaveLocally={(v) => dispatch({ type: 'saveLocally', value: v })}
+          />
         )}
 
-        {(conv || liveCtx?.conversation) && allTargets.length > 0 && (
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--muted-foreground)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 8, padding: '0 4px' }}>
-              Continue this chat in
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-              {allTargets.map((target) => {
-                const b = brandFor(target);
-                return (
-                  <button
-                    key={target}
-                    onClick={() => relay(target)}
-                    disabled={sending !== null}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 9, padding: '9px 10px',
-                      background: 'var(--card)', border: '1px solid var(--border)',
-                      borderRadius: 11, color: 'var(--foreground)', cursor: sending ? 'default' : 'pointer',
-                      fontFamily: FONT_STACK, fontSize: 12.5, fontWeight: 500, textAlign: 'left',
-                      opacity: sending && sending !== target ? 0.55 : 1, transition: 'background 0.15s ease',
-                    }}
-                    onMouseOver={(e) => { if (!sending) (e.currentTarget as HTMLButtonElement).style.background = '#3a3a3a'; }}
-                    onMouseOut={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--card)'; }}
-                  >
-                    <PlatformAvatar source={target} initial={b.initial} color={b.color} size={24} radius={7} />
-                    <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {sending === target ? 'Opening…' : b.name}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
+        {step === 'success' && state.outcome && <SuccessView outcome={state.outcome} busy={busy?.kind === 'syncing'} onRetry={() => void retrySync()} />}
+      </main>
 
-        {stats && stats.totalRelays > 0 && (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 16 }}>
-            {[
-              { l: 'Carried over', v: stats.totalRelays },
-              { l: 'Messages', v: stats.totalMessages },
-              { l: 'Tokens saved', v: stats.estimatedTokensSaved?.toLocaleString() ?? '0' },
-              { l: 'Rate limits', v: stats.rateLimitsDetected ?? 0 },
-            ].map(({ l, v }) => (
-              <Card key={l}>
-                <CardContent style={{ padding: 10 }}>
-                  <div style={{ fontSize: 10, color: 'var(--muted-foreground)' }}>{l}</div>
-                  <div style={{ fontSize: 18, fontWeight: 600 }}>{v}</div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
+      {busy && busy.kind !== 'reading' && <LoadingState label={busy.label} />}
 
-        {recentConvs.length > 0 && (
-          <div>
-            <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--muted-foreground)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 8, padding: '0 4px' }}>Recent</div>
-            {recentConvs.map((r) => {
-              const b = brandFor(r.source);
-              return (
-                <Card key={r.id} style={{ marginBottom: 6, cursor: 'pointer' }} onClick={() => {
-                  chrome.runtime.sendMessage({ type: 'CIRA/GET_CONVERSATION', id: r.id } as RuntimeMessage, (res: { conversation?: { conversation: Conversation } }) => {
-                    if (res?.conversation?.conversation) setConv(res.conversation.conversation);
-                  });
-                }}>
-                  <CardContent style={{ padding: 10, display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <PlatformAvatar source={r.source} initial={b.initial} color={b.color} size={26} radius={8} />
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 500, fontSize: 12.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.title}</div>
-                      <div style={{ fontSize: 10.5, color: 'var(--muted-foreground)', marginTop: 2 }}>
-                        {b.name} · {r.msgs} messages · {timeAgo(r.at)}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-        )}
-      </div>
+      <Footer
+        step={step}
+        busy={!!busy}
+        selectedMessages={state.selectedMessages.size}
+        selectedItems={keptIds.length}
+        target={state.target}
+        saveLocally={state.saveLocally}
+        onBack={() => dispatch({ type: 'back' })}
+        onReview={() => void continueToReview()}
+        onSend={() => dispatch({ type: 'send/open' })}
+        onSubmit={() => void submit()}
+        onNew={() => void readChat()}
+        canRead={canRead}
+      />
     </div>
+  );
+}
+
+function SuccessView({ outcome, busy, onRetry }: { outcome: NonNullable<ReturnType<typeof useWorkspace>['state']['outcome']>; busy: boolean; onRetry: () => void }) {
+  const sync = outcome.sync ? describeSync(outcome.sync) : null;
+  return (
+    <div className="cp-panel cp-success">
+      <StatusBanner level={sync && !sync.ok ? 'warn' : 'success'} title="Context ready">
+        <ul className="cp-facts">
+          <li>{outcome.messageCount} message{outcome.messageCount === 1 ? '' : 's'} selected</li>
+          <li>{outcome.itemCount} context item{outcome.itemCount === 1 ? '' : 's'}</li>
+          <li>{outcome.saved ? (sync?.label ?? 'Saved in browser') : 'Not saved (send only)'}</li>
+          {outcome.sentTo && <li>Sent to {brandFor(outcome.sentTo).name}: review the message there, then press Send.</li>}
+        </ul>
+      </StatusBanner>
+      {sync && !sync.ok && (
+        <StatusBanner
+          level="warn"
+          title="Local sync unavailable"
+          action={sync.retry ? <button type="button" className="cp-btn cp-btn--ghost cp-btn--sm" onClick={onRetry} disabled={busy}><RefreshIcon size={13} /> {busy ? 'Retrying…' : 'Retry'}</button> : undefined}
+        >
+          {sync.detail}
+        </StatusBanner>
+      )}
+      {outcome.safetyWarnings.length > 0 && (
+        <StatusBanner level="warn" title="Potential secrets included">{outcome.safetyWarnings.join(' ')}</StatusBanner>
+      )}
+    </div>
+  );
+}
+
+interface FooterProps {
+  step: ReturnType<typeof useWorkspace>['state']['step'];
+  busy: boolean;
+  selectedMessages: number;
+  selectedItems: number;
+  target: string | null;
+  saveLocally: boolean;
+  canRead: boolean;
+  onBack: () => void;
+  onReview: () => void;
+  onSend: () => void;
+  onSubmit: () => void;
+  onNew: () => void;
+}
+
+function Footer({ step, busy, selectedMessages, selectedItems, target, saveLocally, canRead, onBack, onReview, onSend, onSubmit, onNew }: FooterProps) {
+  if (step === 'idle') return null;
+  const back = step === 'review' || step === 'send' ? (
+    <button type="button" className="cp-btn cp-btn--ghost" onClick={onBack} disabled={busy}><ChevronLeftIcon size={14} /> Back</button>
+  ) : null;
+
+  let primary: ReactNode = null;
+  if (step === 'select') {
+    primary = <button type="button" className="cp-btn cp-btn--primary" onClick={onReview} disabled={busy || selectedMessages === 0}>Continue to Review</button>;
+  } else if (step === 'review') {
+    primary = <button type="button" className="cp-btn cp-btn--primary" onClick={onSend} disabled={busy || selectedItems === 0}>Continue</button>;
+  } else if (step === 'send') {
+    const name = target ? brandFor(target).name : '';
+    const label = target ? (saveLocally ? `Save & send to ${name}` : `Send to ${name}`) : 'Save context';
+    primary = (
+      <button type="button" className="cp-btn cp-btn--primary" onClick={onSubmit} disabled={busy || (!target && !saveLocally)}>
+        {target ? <SendIcon size={14} /> : <SaveIcon size={14} />} {label}
+      </button>
+    );
+  } else if (step === 'success') {
+    primary = <button type="button" className="cp-btn cp-btn--ghost" onClick={onNew} disabled={busy || !canRead}>Start a new context</button>;
+  }
+
+  const hint =
+    step === 'select' && selectedMessages === 0 ? 'Select at least one message to continue.' :
+    step === 'review' && selectedItems === 0 ? 'Select at least one context item.' :
+    step === 'send' && !target && !saveLocally ? 'Choose a target AI or Save locally.' : null;
+
+  return (
+    <footer className="cp-footer">
+      {hint && <div className="cp-footer-hint">{hint}</div>}
+      <div className="cp-footer-row">
+        {back}
+        <span className="cp-spacer" />
+        {primary}
+      </div>
+    </footer>
   );
 }

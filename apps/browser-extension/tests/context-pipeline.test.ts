@@ -7,8 +7,10 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { createMemoryArea, validate, type PCODocument } from '@cira/core';
-import { saveConversationAsPco } from '@/background/context-pipeline';
+import { resyncStoredPco, saveConversationAsPco } from '@/background/context-pipeline';
 import { describeSaveResult } from '@/shared/context-client';
+import { buildSelectedContext } from '@/shared/context-selection';
+import { selectionConversation } from './helpers/selection-conversation';
 import { ChromeContextStore } from '@/storage/chrome-context-store';
 import type { Conversation } from '@/shared/schema';
 
@@ -71,6 +73,43 @@ describe('browser capture → PCO pipeline', () => {
     expect(await store.list()).toHaveLength(1);
     const stored = await store.get(a.ok ? a.id : '');
     expect(stored?.conversations[0].turns).toHaveLength(4);
+  });
+
+  it('with a selection: stores and syncs only the selected messages and items', async () => {
+    const area = createMemoryArea();
+    const store = new ChromeContextStore(area);
+    const sync = vi.fn(async (doc: PCODocument) => ({ status: 'synced' as const, path: `/home/u/.cira/contexts/${doc.id}.pco.json` }));
+    const conv = selectionConversation();
+    const { draft } = buildSelectedContext(conv, { messageIndexes: [0, 2] }, { client: CLIENT });
+    const itemIds = draft.items.filter((i) => i.content !== 'Do not use Firebase.').map((i) => i.id);
+
+    const r = await saveConversationAsPco(conv, { store, sync, client: CLIENT }, { messageIndexes: [0, 2], itemIds });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(validate(r.document).ok).toBe(true);
+    expect(r.document.conversations[0].turns.map((t) => t.index)).toEqual([0, 2]);
+    expect(r.document.items.map((i) => i.id)).toEqual(itemIds);
+    expect(JSON.stringify(r.document.items)).not.toContain('Firebase');
+    expect(sync).toHaveBeenCalledWith(r.document);
+    expect(await store.get(r.id)).toEqual(r.document);
+  });
+
+  it('with a selection: reports empty selections and stale item IDs as failures', async () => {
+    const store = new ChromeContextStore(createMemoryArea());
+    const conv = selectionConversation();
+    expect(await saveConversationAsPco(conv, { store, client: CLIENT }, { messageIndexes: [] })).toEqual({ ok: false, error: 'Select at least one message to continue.' });
+    const stale = await saveConversationAsPco(conv, { store, client: CLIENT }, { messageIndexes: [0], itemIds: ['itm_gone'] });
+    expect(stale.ok).toBe(false);
+    expect(await store.list()).toEqual([]);
+  });
+
+  it('retry sync re-sends the stored PCO to the local host', async () => {
+    const store = new ChromeContextStore(createMemoryArea());
+    const r = await saveConversationAsPco(load('decisions'), { store, client: CLIENT, sync: async () => ({ status: 'error', message: 'Failed to start native messaging host.' }) });
+    expect(r.ok && r.sync.status).toBe('error');
+    const sync = vi.fn(async (doc: PCODocument) => ({ status: 'synced' as const, path: `/x/${doc.id}.pco.json` }));
+    expect(await resyncStoredPco(r.ok ? r.id : '', { store, sync })).toEqual({ status: 'synced', path: expect.stringContaining('.pco.json') });
+    expect(await resyncStoredPco('pco_missing', { store, sync })).toMatchObject({ status: 'error' });
   });
 
   it('reports a failure instead of throwing on malformed input', async () => {

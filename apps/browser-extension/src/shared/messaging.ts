@@ -1,4 +1,5 @@
 import type { Conversation, RelayPayload } from '@/shared/schema';
+import type { ContextSelection } from '@/shared/context-selection';
 
 export type RuntimeMessage =
   | { type: 'CIRA/EXTRACT_REQUEST' }
@@ -26,7 +27,8 @@ export type RuntimeMessage =
   | { type: 'CIRA/FETCH_IMAGE'; url: string }
   | { type: 'CIRA/EXPORT_CONVERSATION'; conversation: Conversation }
   // Phase 01 context pipeline (replies: SaveContextResponse / PCODocument | null / ContextSummary[])
-  | { type: 'CIRA/SAVE_CONTEXT'; conversation: Conversation }
+  | { type: 'CIRA/SAVE_CONTEXT'; conversation: Conversation; selection?: ContextSelection }
+  | { type: 'CIRA/SYNC_CONTEXT'; id: string }
   | { type: 'CIRA/GET_CONTEXT'; id: string }
   | { type: 'CIRA/LIST_CONTEXTS' }
   | { type: 'MCP/EXTRACT'; source: string }

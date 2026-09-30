@@ -209,4 +209,17 @@ describe('encoder: conversation → PCO', () => {
     expect(doc.metadata.title).toBe('Combined');
     expect(validate(doc).ok).toBe(true);
   });
+
+  it('keeps original turn indices when encoding a subset of a conversation', () => {
+    const { input } = fromLegacyConversation(loadFixture('decisions'));
+    const full = encode(input, { now: NOW });
+    const subset = encode({ ...input, turns: input.turns.map((t, index) => ({ ...t, index })).filter((t) => t.index !== 0) }, { now: NOW });
+
+    expect(subset.conversations[0].turns.map((t) => t.index)).toEqual(full.conversations[0].turns.slice(1).map((t) => t.index));
+    expect(subset.conversations[0].turns.map((t) => t.id)).toEqual(full.conversations[0].turns.slice(1).map((t) => t.id));
+    // Items from the kept turns are identical (same IDs, same provenance); items from turn 0 are gone.
+    const t0 = full.conversations[0].turns[0].id;
+    expect(subset.items).toEqual(full.items.filter((i) => i.provenance.turn_id !== t0));
+    expect(validate(subset).ok).toBe(true);
+  });
 });

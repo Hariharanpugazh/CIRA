@@ -4,7 +4,7 @@ import type { RuntimeMessage } from '@/shared/messaging';
 import type { Conversation } from '@/shared/schema';
 import { buildRelaySummary } from '@/shared/relay';
 import { ChromeContextStore } from '@/storage/chrome-context-store';
-import { saveConversationAsPco } from './context-pipeline';
+import { resyncStoredPco, saveConversationAsPco } from './context-pipeline';
 import { syncToLocalHost } from './local-sync';
 
 const CLIENT_ID = `cira-browser-extension@${chrome.runtime.getManifest().version}`;
@@ -251,11 +251,16 @@ chrome.runtime.onMessage.addListener((msg: RuntimeMessage, _sender, sendResponse
       return false;
 
     case 'CIRA/SAVE_CONTEXT': {
-      void saveConversationAsPco(msg.conversation, {
-        store: contextStore,
-        sync: syncToLocalHost,
-        client: CLIENT_ID,
-      }).then(sendResponse);
+      void saveConversationAsPco(
+        msg.conversation,
+        { store: contextStore, sync: syncToLocalHost, client: CLIENT_ID },
+        msg.selection,
+      ).then(sendResponse);
+      return true;
+    }
+
+    case 'CIRA/SYNC_CONTEXT': {
+      void resyncStoredPco(msg.id, { store: contextStore, sync: syncToLocalHost }).then(sendResponse);
       return true;
     }
 

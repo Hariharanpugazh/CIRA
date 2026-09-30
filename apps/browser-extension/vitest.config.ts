@@ -7,9 +7,11 @@ export default defineConfig({
       '@': resolve(__dirname, 'src'),
     },
   },
+  // Components use the automatic JSX runtime (tsconfig "jsx": "react-jsx").
+  esbuild: { jsx: 'automatic' },
   test: {
     name: 'browser-extension',
-    include: ['tests/**/*.test.ts'],
+    include: ['tests/**/*.test.{ts,tsx}'],
     environment: 'node',
   },
 });

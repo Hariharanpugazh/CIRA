@@ -16,6 +16,7 @@ import {
   type PCODocument,
 } from '@cira/core';
 import type { Conversation } from '@/shared/schema';
+import { buildSelectedContext, type ContextSelection } from '@/shared/context-selection';
 
 export type SyncResult =
   | { status: 'synced'; path: string }
@@ -39,6 +40,18 @@ export interface SaveContextFailure {
   error: string;
 }
 
+/** Retry the local sync of an already stored PCO (side panel "Retry"). */
+export async function resyncStoredPco(id: string, deps: Pick<PipelineDeps, 'store' | 'sync'>): Promise<SyncResult> {
+  const doc = await deps.store.get(id);
+  if (!doc) return { status: 'error', message: `No stored context with id ${id}` };
+  if (!deps.sync) return { status: 'skipped' };
+  try {
+    return await deps.sync(doc);
+  } catch (err) {
+    return { status: 'error', message: err instanceof Error ? err.message : String(err) };
+  }
+}
+
 export type SaveContextResponse = SaveContextSuccess | SaveContextFailure;
 
 export interface PipelineDeps {
@@ -49,13 +62,21 @@ export interface PipelineDeps {
   now?: () => Date;
 }
 
-export async function saveConversationAsPco(conversation: Conversation, deps: PipelineDeps): Promise<SaveContextResponse> {
+/**
+ * Without `selection` the whole conversation is encoded (Phase 01 behaviour,
+ * used by the popup). With `selection` only the chosen messages reach the
+ * encoder and only the chosen items are kept (side panel review flow).
+ */
+export async function saveConversationAsPco(
+  conversation: Conversation,
+  deps: PipelineDeps,
+  selection?: ContextSelection,
+): Promise<SaveContextResponse> {
   try {
-    const { document, warnings } = migrateLegacyConversation(conversation, {
-      client: deps.client,
-      createdBy: deps.client,
-      now: (deps.now ?? (() => new Date()))(),
-    });
+    const now = (deps.now ?? (() => new Date()))();
+    const { document, warnings } = selection
+      ? buildSelectedContext(conversation, selection, { client: deps.client, now })
+      : migrateLegacyConversation(conversation, { client: deps.client, createdBy: deps.client, now });
 
     const validation = validate(document);
     if (!validation.ok) {
