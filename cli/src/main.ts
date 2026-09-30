@@ -6,7 +6,7 @@ import { defaultContextDir, FileContextStore } from '@cira/core/node';
 import { cmdExport, cmdList, cmdMigrate, cmdSave, cmdValidate } from './commands/documents';
 import { CliError, UsageError, type CliIO } from './io';
 import { runHost } from './native/host';
-import { applyInstall, applyUninstall, parseBrowser, planInstall, registryValue } from './native/install';
+import { applyInstall, applyUninstall, parseBrowser, planInstall, readComSpecState, registryValue, type Exec } from './native/install';
 
 export const VERSION = '0.1.0';
 
@@ -61,6 +61,8 @@ export interface RunOptions {
   platform?: NodeJS.Platform;
   stdin?: NodeJS.ReadableStream;
   rawStdout?: NodeJS.WritableStream;
+  /** Runs `reg` / `setx` (argument arrays, no shell). Injectable for tests. */
+  exec?: Exec;
 }
 
 export async function run(argv: string[], io: CliIO, options: RunOptions = {}): Promise<number> {
@@ -136,38 +138,51 @@ async function nativeHostCommand(
     scriptPath: options.scriptPath ?? fileURLToPath(import.meta.url),
   };
 
+  const windows = platform === 'win32';
+  const exec = options.exec;
+  const comspec = windows && (sub === 'install' || sub === 'status') ? await readComSpecState(exec) : undefined;
+
   if (sub === 'install') {
-    const plan = planInstall({ ...base, extensionIds: v['extension-id'] ?? [] });
-    for (const f of plan.files) io.stdout(`${v['dry-run'] ? 'would write' : 'write'} ${f.path}\n`);
-    if (plan.registry) io.stdout(`${v['dry-run'] ? 'would set' : 'set'} ${plan.registry.key} = ${plan.registry.value}\n`);
+    const plan = planInstall({ ...base, extensionIds: v['extension-id'] ?? [], comspec });
+    const verb = (now: string, later: string) => (v['dry-run'] ? later : now);
+    for (const f of plan.files) io.stdout(`${verb('write', 'would write')} ${f.path}\n`);
+    if (plan.registry) io.stdout(`${verb('set', 'would set')} ${plan.registry.key} = ${plan.registry.value}\n`);
+    if (plan.comspec?.fix) io.stdout(`${verb('set', 'would set')} user environment ComSpec = ${plan.comspec.fix.value} (${plan.comspec.fix.reason})\n`);
+    if (plan.comspec?.warning) io.stderr(`warning: ${plan.comspec.warning}\n`);
     if (!v['dry-run']) {
-      await applyInstall(plan);
+      await applyInstall(plan, exec);
       io.stdout(`\nInstalled the CIRA native host for ${browser}. Reload the extension, then capture a conversation.\nPCOs will be written to ${defaultContextDir(io.env)}\n`);
+      if (plan.comspec?.fix) {
+        io.stdout(`\nComSpec was missing, so ${browser} could not start any native host. Quit ${browser} completely (all windows and background apps) and start it again so it picks up ComSpec.\n`);
+      }
     }
     return 0;
   }
 
   // Paths do not depend on the extension ID; use a placeholder for planning.
-  const plan = planInstall({ ...base, extensionIds: ['a'.repeat(32)] });
+  const plan = planInstall({ ...base, extensionIds: ['a'.repeat(32)], comspec });
   if (sub === 'uninstall') {
-    const removed = await applyUninstall(plan);
+    const removed = await applyUninstall(plan, exec);
     io.stdout(removed.length ? removed.map((r) => `removed ${r}`).join('\n') + '\n' : 'Nothing to remove.\n');
     return 0;
   }
   if (sub === 'status') {
     const manifestOk = existsSync(plan.manifestPath);
     const launcherOk = existsSync(plan.launcherPath);
-    const reg = plan.registry ? await registryValue(plan.registry.key) : undefined;
+    const reg = plan.registry ? await registryValue(plan.registry.key, exec) : undefined;
+    const cs = plan.comspec;
     io.stdout(
       [
         `browser:   ${browser}`,
         `manifest:  ${plan.manifestPath} ${manifestOk ? '(present)' : '(missing)'}`,
         `launcher:  ${plan.launcherPath} ${launcherOk ? '(present)' : '(missing)'}`,
         ...(plan.registry ? [`registry:  ${plan.registry.key} ${reg ? `→ ${reg}` : '(not set)'}`] : []),
+        ...(cs ? [`comspec:   ${cs.ok ? cs.value : `${cs.fix?.reason ?? 'unusable'}; run \`cira native-host install\` to fix`}`] : []),
+        ...(cs?.warning ? [`warning:   ${cs.warning}`] : []),
         `store:     ${defaultContextDir(io.env)}`,
       ].join('\n') + '\n',
     );
-    return manifestOk && launcherOk && (plan.registry ? !!reg : true) ? 0 : 1;
+    return manifestOk && launcherOk && (plan.registry ? !!reg : true) && (cs ? cs.ok : true) ? 0 : 1;
   }
   throw new UsageError('usage: cira native-host install|uninstall|status');
 }

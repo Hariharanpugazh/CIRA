@@ -3,7 +3,8 @@
 // Serves fake chatgpt.com / claude.ai pages (no network, no login) and checks:
 //   1. the content script starts on https://chatgpt.com/c/... and answers the PING handshake
 //   2. Read chat (EXTRACT_REQUEST) returns the conversation
-//   3. CIRA/SAVE_CONTEXT encodes + validates + stores a PCO (chrome.storage.local)
+//   3. CIRA/SAVE_CONTEXT encodes + validates + stores a PCO (chrome.storage.local),
+//      keeping Unicode code blocks (box drawing, arrows, CJK, emoji) unchanged
 //   4. the legacy relay still stages and injects the handoff text into claude.ai
 //
 // The native host is NOT registered for Playwright's Chromium, so sync is expected
@@ -21,11 +22,19 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const ext = join(root, 'dist');
 const profile = mkdtempSync(join(tmpdir(), 'cira-browser-'));
 const CHAT_URL = 'https://chatgpt.com/c/6abbf296-f460-83e8-b7e5-9df7ad7ea3b1';
+// Unicode that must survive DOM → Markdown → PCO → relay unchanged (box drawing, arrows, check marks, CJK, emoji).
+const UNICODE_BLOCK = 'project/\n├── frontend/\n│   └── src/\n└── README.md\n  │\n  ▼\nlogin → token ✓ 日本語 😀';
 
 const CHATGPT_HTML = `<!doctype html><html><head><title>Session storage - ChatGPT</title></head><body><main>
 <div data-testid="conversation-turn-1"><div data-message-author-role="user"><div class="whitespace-pre-wrap">We're building a sync service. Do not use Firebase. How should we store sessions?</div></div></div>
-<div data-testid="conversation-turn-2"><div data-message-author-role="assistant"><div class="markdown"><p>We'll use Postgres for sessions.</p><pre><code class="language-ts">const pool = new Pool();</code></pre></div></div></div>
+<div data-testid="conversation-turn-2"><div data-message-author-role="assistant"><div class="markdown"><p>We'll use Postgres for sessions.</p><pre><code class="language-ts">const pool = new Pool();</code></pre><pre><code class="language-text">${UNICODE_BLOCK}</code></pre></div></div></div>
 </main><div id="prompt-textarea" contenteditable="true"></div></body></html>`;
+// Served like the real sites ("text/html; charset=utf-8"). Without a charset Chromium decodes the
+// page as Windows-1252 and the DOM itself would hold "â”œâ”€â”€" before CIRA reads anything.
+const HTML = 'text/html; charset=utf-8';
+/** UTF-8 bytes of `s` read as Windows-1252: the mojibake from the Phase 01 report. */
+const asWindows1252 = (s) => new TextDecoder('windows-1252').decode(new TextEncoder().encode(s));
+const UNICODE_SAMPLES = ['├──', '│', '└──', '▼', '→', '✓', '日本語', '😀'];
 const CLAUDE_HTML = `<!doctype html><html><head><title>Claude</title></head><body>
 <div contenteditable="true" class="ProseMirror" role="textbox"></div></body></html>`;
 
@@ -44,9 +53,9 @@ try {
   await ctx.route('https://chatgpt.com/**', (route) =>
     /\/(api|backend-api)\//.test(route.request().url())
       ? route.fulfill({ status: 401, body: '{}' })
-      : route.fulfill({ status: 200, contentType: 'text/html', body: CHATGPT_HTML }),
+      : route.fulfill({ status: 200, contentType: HTML, body: CHATGPT_HTML }),
   );
-  await ctx.route('https://claude.ai/**', (route) => route.fulfill({ status: 200, contentType: 'text/html', body: CLAUDE_HTML }));
+  await ctx.route('https://claude.ai/**', (route) => route.fulfill({ status: 200, contentType: HTML, body: CLAUDE_HTML }));
   await ctx.route('https://fonts.googleapis.com/**', (route) => route.fulfill({ status: 200, contentType: 'text/css', body: '' }));
 
   const sw = ctx.serviceWorkers()[0] ?? (await ctx.waitForEvent('serviceworker'));
@@ -83,6 +92,15 @@ try {
   check('Read chat: EXTRACT_REQUEST returns 2 messages', r.extract?.type === 'CIRA/EXTRACT_RESPONSE' && msgs.length === 2, r.extract ?? r.extractError);
   check('capture → PCO saved in chrome.storage', r.save?.ok === true && r.save.summary.item_count > 0 && r.list?.length === 1, r.save);
   check('PCO provenance points at chatgpt.com', r.save?.document?.conversations?.[0]?.url === CHAT_URL && r.save?.document?.conversations?.[0]?.source?.platform === 'chatgpt');
+  const pcoJson = JSON.stringify(r.save?.document ?? {});
+  const codeItems = (r.save?.document?.items ?? []).filter((i) => i.type === 'code_artifact').map((i) => i.content);
+  check(
+    'PCO keeps Unicode code blocks exactly (box drawing, arrows, check marks, CJK, emoji)',
+    codeItems.includes(UNICODE_BLOCK) &&
+      (r.save?.document?.conversations?.[0]?.turns?.[1]?.content ?? '').includes(UNICODE_BLOCK) &&
+      UNICODE_SAMPLES.every((s) => !pcoJson.includes(asWindows1252(s))),
+    codeItems,
+  );
   check('local sync status reported (host not registered for test Chromium)', ['host_unavailable', 'synced'].includes(r.save?.sync?.status), r.save?.sync);
   check('legacy relay staged', r.stage?.ok === true, r.stage);
 
@@ -91,6 +109,12 @@ try {
   await claude.waitForFunction(() => document.querySelector('[contenteditable="true"]')?.textContent?.length > 0, null, { timeout: 8000 }).catch(() => {});
   const injected = await claude.evaluate(() => document.querySelector('[contenteditable="true"]')?.innerText ?? '');
   check('legacy relay injected handoff into claude.ai', injected.startsWith('# Context handoff from CHATGPT') && injected.includes('Title: Session storage'), injected.slice(0, 120));
+  const relayed = injected.replace(/\u00a0/g, ' ');
+  check(
+    'legacy relay carries the Unicode code block into claude.ai',
+    UNICODE_SAMPLES.every((s) => relayed.includes(s) && !relayed.includes(asWindows1252(s))),
+    relayed.slice(relayed.indexOf('project/'), relayed.indexOf('project/') + 160),
+  );
 } finally {
   await ctx.close();
   rmSync(profile, { recursive: true, force: true });

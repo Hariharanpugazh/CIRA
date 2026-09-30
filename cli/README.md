@@ -35,6 +35,17 @@ Exit codes:
 | 1 | invalid input or failure |
 | 2 | usage error |
 
+### Reading PCO files in Windows PowerShell 5.1
+
+PCO files are UTF-8 without a BOM. Windows PowerShell 5.1 decodes BOM-less files with the ANSI code page, and the output of native commands with the console code page. So `├──` can show up as `â”œâ”€â”€` (`Get-Content`, `type`) or `Ôö£ÔöÇÔöÇ` (`cira export … > file.md`) even though the stored file is correct. Read and write as UTF-8 instead:
+
+```powershell
+Get-Content -Encoding UTF8 $HOME\.cira\contexts\<id>.pco.json
+cira export <id> --format md -o context.md   # writes UTF-8; avoid `> context.md`
+```
+
+PowerShell 7 reads BOM-less files as UTF-8 by default.
+
 ## Local host for the browser extension
 
 The extension saves PCOs to disk through Chrome native messaging. To enable it:
@@ -52,6 +63,7 @@ node cli/dist/cira.js native-host status
 - registers the manifest:
   - on Windows, under `HKCU\Software\Google\Chrome\NativeMessagingHosts\com.cira.context_host` (per-user, no admin needed)
   - on macOS and Linux, by copying it into the browser's per-user `NativeMessagingHosts` folder
+- on Windows, checks `ComSpec`. Chrome starts every native host (`.cmd` or `.exe`) through `%ComSpec%`, and with the variable missing it fails with "Failed to start native messaging host." (`COMSPEC is not set` in `chrome --enable-logging` output). If it is missing or points at a file that doesn't exist, `install` sets the per-user value to `%SystemRoot%\System32\cmd.exe`. Quit Chrome completely and start it again afterwards.
 
 Use `--browser edge|chromium|brave` for other browsers, and `--dry-run` to preview. `native-host uninstall` reverses it.
 

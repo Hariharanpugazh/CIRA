@@ -4,7 +4,7 @@
 //
 //   pnpm build && node scripts/smoke-e2e.mjs
 import { execFileSync, spawn } from 'node:child_process';
-import { mkdtempSync, readdirSync, rmSync, writeFileSync, chmodSync } from 'node:fs';
+import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync, chmodSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -15,25 +15,15 @@ const home = mkdtempSync(join(tmpdir(), 'cira-e2e-'));
 const env = { ...process.env, CIRA_HOME: home };
 const step = (s) => console.log(`\n=== ${s} ===`);
 const cira = (...args) => execFileSync(process.execPath, [cli, ...args], { env, encoding: 'utf8' });
+const win = process.platform === 'win32';
 
-try {
-  step('1. browser capture (legacy Conversation) → PCO');
-  const pco = cira('migrate', join(root, 'packages/core/tests/fixtures/legacy/chatgpt-popup-export.json'), '--stdout');
-  console.log(`encoded ${JSON.parse(pco).items.length} items`);
-
-  step('2. native host via launcher (as Chrome starts it)');
-  const win = process.platform === 'win32';
-  const launcher = join(home, win ? 'host.cmd' : 'host.sh');
-  writeFileSync(
-    launcher,
-    win ? `@echo off\r\n"${process.execPath}" "${cli}" native-host %*\r\n` : `#!/bin/sh\nexec "${process.execPath}" "${cli}" native-host "$@"\n`,
-  );
-  if (!win) chmodSync(launcher, 0o755);
-  const reply = await new Promise((res, rej) => {
+/** Send one framed request through the launcher, started the way Chrome starts it; resolve the framed reply. */
+function sendViaLauncher(launcher, env, document) {
+  return new Promise((res, rej) => {
     const child = win
       ? spawn('cmd.exe', ['/d', '/s', '/c', `"${launcher}" chrome-extension://abcdefghijklmnopabcdefghijklmnop/ --parent-window=0`], { env, windowsVerbatimArguments: true, stdio: ['pipe', 'pipe', 'ignore'] })
       : spawn(launcher, ['chrome-extension://abcdefghijklmnopabcdefghijklmnop/'], { env, stdio: ['pipe', 'pipe', 'ignore'] });
-    const body = Buffer.from(JSON.stringify({ type: 'save', document: JSON.parse(pco) }));
+    const body = Buffer.from(JSON.stringify({ type: 'save', document }));
     const header = Buffer.alloc(4);
     header.writeUInt32LE(body.length);
     child.stdin.end(Buffer.concat([header, body]));
@@ -45,6 +35,21 @@ try {
       res(JSON.parse(buf.subarray(4, 4 + buf.readUInt32LE(0)).toString('utf8')));
     });
   });
+}
+
+try {
+  step('1. browser capture (legacy Conversation) → PCO');
+  const pco = cira('migrate', join(root, 'packages/core/tests/fixtures/legacy/chatgpt-popup-export.json'), '--stdout');
+  console.log(`encoded ${JSON.parse(pco).items.length} items`);
+
+  step('2. native host via launcher (as Chrome starts it)');
+  const launcher = join(home, win ? 'host.cmd' : 'host.sh');
+  writeFileSync(
+    launcher,
+    win ? `@echo off\r\n"${process.execPath}" "${cli}" native-host %*\r\n` : `#!/bin/sh\nexec "${process.execPath}" "${cli}" native-host "$@"\n`,
+  );
+  if (!win) chmodSync(launcher, 0o755);
+  const reply = await sendViaLauncher(launcher, env, JSON.parse(pco));
   console.log(reply);
   if (!reply.ok) throw new Error('native host failed');
 
@@ -73,6 +78,22 @@ try {
     });`], { env, encoding: 'utf8' });
   if (mcpFull !== md) throw new Error('MCP get_context differs from `cira export --format md`');
   console.log('MCP get_context output is identical to `cira export --format md`.');
+
+  step('7. Unicode through the launcher: bytes on disk and export stdout stay UTF-8');
+  // Separate store so steps 1–6 are unaffected.
+  const uEnv = { ...env, CIRA_HOME: join(home, 'unicode') };
+  const uDoc = JSON.parse(execFileSync(process.execPath, [cli, 'migrate', join(root, 'packages/core/tests/fixtures/legacy/chatgpt-unicode-capture.json'), '--stdout'], { env: uEnv, encoding: 'utf8' }));
+  const uReply = await sendViaLauncher(launcher, uEnv, uDoc);
+  if (!uReply.ok) throw new Error(`native host failed on the Unicode document: ${JSON.stringify(uReply)}`);
+  const onDisk = readFileSync(uReply.path);
+  const exported = execFileSync(process.execPath, [cli, 'export', uReply.id, '--format', 'md'], { env: uEnv }); // raw stdout bytes
+  if (onDisk[0] === 0xef && onDisk[1] === 0xbb && onDisk[2] === 0xbf) throw new Error('stored PCO starts with a BOM');
+  const utf8AndNotMojibake = (buf, s) => buf.includes(Buffer.from(s)) && !buf.includes(Buffer.from(new TextDecoder('windows-1252').decode(Buffer.from(s))));
+  const inCode = ['├──', '│', '└──', '▼', '→', '✓', '🔐', 'ログイン']; // code blocks: in the PCO and in every export
+  const inProse = ['日本語', 'Ελληνικά', 'हिन्दी', '😀']; // assistant prose: in the PCO transcript
+  for (const s of [...inCode, ...inProse]) if (!utf8AndNotMojibake(onDisk, s)) throw new Error(`stored PCO does not hold ${s} as UTF-8`);
+  for (const s of inCode) if (!utf8AndNotMojibake(exported, s)) throw new Error(`export --format md stdout lost ${s}`);
+  console.log(`${uReply.path}\nU+251C is stored as ${Buffer.from('\u251c').toString('hex')} (UTF-8, no BOM); export stdout holds the same bytes.`);
   console.log('\nE2E OK');
 } finally {
   rmSync(home, { recursive: true, force: true });

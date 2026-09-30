@@ -1,0 +1,16 @@
+{
+  "source": "chatgpt",
+  "title": "TypeScript React Django Stack",
+  "url": "https://chatgpt.com/c/68fa1c2e-9d3b-8001-a4c7-2b5e8f0d1a93",
+  "capturedAt": "2026-09-30T09:15:00.000Z",
+  "messages": [
+    {
+      "role": "user",
+      "content": "I'm building a TypeScript project. I prefer React and Tailwind. The backend should use Django. The project needs authentication."
+    },
+    {
+      "role": "assistant",
+      "content": "## Project structure\n\n```text\nproject/\n├── frontend/\n│   ├── src/\n│   └── App.tsx\n└── README.md\n```\n\n## Authentication flow\n\n| Step | Result |\n| --- | --- |\n| Login → token | ✓ |\n\n```text\nBrowser (React)\n      │\n      ▼\nDjango /api/auth/login → JWT ✓ 🔐 connexion réussie · ログイン成功\n```\n\nMultilingual: Café naïve façade — 日本語 · Ελληνικά · हिन्दी · русский · 😀"
+    }
+  ]
+}
