@@ -1,0 +1,279 @@
+{
+  "pco_version": "0.1",
+  "id": "pco_4ca51855d1a92a98",
+  "metadata": {
+    "created_at": "2026-09-29T12:00:00.000Z",
+    "updated_at": "2026-09-29T12:00:00.000Z",
+    "created_by": {
+      "agent": "cira-examples"
+    },
+    "title": "CIRA sync service"
+  },
+  "conversations": [
+    {
+      "id": "conv_02350245e640218e",
+      "source": {
+        "kind": "browser",
+        "platform": "claude",
+        "client": "cira-examples"
+      },
+      "captured_at": "2026-09-21T08:30:00.000Z",
+      "turns": [
+        {
+          "id": "conv_02350245e640218e_t0",
+          "index": 0,
+          "role": "user",
+          "content": "We're building a sync service for CIRA. The backend is written in TypeScript on Node 22. Do not use Firebase. The API must be versioned."
+        },
+        {
+          "id": "conv_02350245e640218e_t1",
+          "index": 1,
+          "role": "assistant",
+          "content": "Understood. Here's a minimal versioned router:\n\n```ts src/router.ts\nexport const router = createRouter({ prefix: '/v1' });\n```\n\nWe'll use Fastify for the HTTP layer since it has first-class TypeScript types."
+        },
+        {
+          "id": "conv_02350245e640218e_t2",
+          "index": 2,
+          "role": "user",
+          "content": "Sounds good, we decided to use Fastify. Next step: add request validation with Zod. Should we store sessions in Redis?"
+        }
+      ],
+      "title": "CIRA sync service",
+      "url": "https://claude.ai/chat/22222222-2222-4222-8222-222222222222"
+    }
+  ],
+  "items": [
+    {
+      "type": "fact",
+      "content": "We're building a sync service for CIRA.",
+      "confidence": 0.5,
+      "id": "itm_33da29c5f52e1be2",
+      "provenance": {
+        "source": {
+          "kind": "browser",
+          "platform": "claude",
+          "client": "cira-examples"
+        },
+        "conversation_id": "conv_02350245e640218e",
+        "captured_at": "2026-09-21T08:30:00.000Z",
+        "extracted_by": {
+          "method": "heuristic",
+          "agent": "cira.heuristic-statements@0.1.0"
+        },
+        "turn_id": "conv_02350245e640218e_t0",
+        "span": {
+          "start": 0,
+          "end": 39
+        }
+      },
+      "created_at": "2026-09-29T12:00:00.000Z"
+    },
+    {
+      "type": "fact",
+      "content": "The backend is written in TypeScript on Node 22.",
+      "confidence": 0.5,
+      "id": "itm_38bc7058b4056717",
+      "provenance": {
+        "source": {
+          "kind": "browser",
+          "platform": "claude",
+          "client": "cira-examples"
+        },
+        "conversation_id": "conv_02350245e640218e",
+        "captured_at": "2026-09-21T08:30:00.000Z",
+        "extracted_by": {
+          "method": "heuristic",
+          "agent": "cira.heuristic-statements@0.1.0"
+        },
+        "turn_id": "conv_02350245e640218e_t0",
+        "span": {
+          "start": 40,
+          "end": 88
+        }
+      },
+      "created_at": "2026-09-29T12:00:00.000Z"
+    },
+    {
+      "type": "constraint",
+      "strength": "must_not",
+      "content": "Do not use Firebase.",
+      "confidence": 0.7,
+      "id": "itm_3076fec0cd893c42",
+      "provenance": {
+        "source": {
+          "kind": "browser",
+          "platform": "claude",
+          "client": "cira-examples"
+        },
+        "conversation_id": "conv_02350245e640218e",
+        "captured_at": "2026-09-21T08:30:00.000Z",
+        "extracted_by": {
+          "method": "heuristic",
+          "agent": "cira.heuristic-statements@0.1.0"
+        },
+        "turn_id": "conv_02350245e640218e_t0",
+        "span": {
+          "start": 89,
+          "end": 109
+        }
+      },
+      "created_at": "2026-09-29T12:00:00.000Z"
+    },
+    {
+      "type": "constraint",
+      "strength": "must",
+      "content": "The API must be versioned.",
+      "confidence": 0.7,
+      "id": "itm_4d0906b52415394d",
+      "provenance": {
+        "source": {
+          "kind": "browser",
+          "platform": "claude",
+          "client": "cira-examples"
+        },
+        "conversation_id": "conv_02350245e640218e",
+        "captured_at": "2026-09-21T08:30:00.000Z",
+        "extracted_by": {
+          "method": "heuristic",
+          "agent": "cira.heuristic-statements@0.1.0"
+        },
+        "turn_id": "conv_02350245e640218e_t0",
+        "span": {
+          "start": 110,
+          "end": 136
+        }
+      },
+      "created_at": "2026-09-29T12:00:00.000Z"
+    },
+    {
+      "type": "code_artifact",
+      "content": "export const router = createRouter({ prefix: '/v1' });",
+      "language": "ts",
+      "confidence": 1,
+      "filename": "src/router.ts",
+      "id": "itm_98f6566d748ff531",
+      "provenance": {
+        "source": {
+          "kind": "browser",
+          "platform": "claude",
+          "client": "cira-examples"
+        },
+        "conversation_id": "conv_02350245e640218e",
+        "captured_at": "2026-09-21T08:30:00.000Z",
+        "extracted_by": {
+          "method": "deterministic",
+          "agent": "cira.code-blocks@0.1.0"
+        },
+        "turn_id": "conv_02350245e640218e_t1",
+        "span": {
+          "start": 48,
+          "end": 126
+        }
+      },
+      "created_at": "2026-09-29T12:00:00.000Z"
+    },
+    {
+      "type": "decision",
+      "status": "proposed",
+      "content": "We'll use Fastify for the HTTP layer since it has first-class TypeScript types.",
+      "confidence": 0.5,
+      "id": "itm_c83bbdb5e961ad9e",
+      "provenance": {
+        "source": {
+          "kind": "browser",
+          "platform": "claude",
+          "client": "cira-examples"
+        },
+        "conversation_id": "conv_02350245e640218e",
+        "captured_at": "2026-09-21T08:30:00.000Z",
+        "extracted_by": {
+          "method": "heuristic",
+          "agent": "cira.heuristic-statements@0.1.0"
+        },
+        "turn_id": "conv_02350245e640218e_t1",
+        "span": {
+          "start": 128,
+          "end": 207
+        }
+      },
+      "created_at": "2026-09-29T12:00:00.000Z"
+    },
+    {
+      "type": "decision",
+      "status": "accepted",
+      "content": "Sounds good, we decided to use Fastify.",
+      "confidence": 0.65,
+      "id": "itm_0c947f95d7996e6d",
+      "provenance": {
+        "source": {
+          "kind": "browser",
+          "platform": "claude",
+          "client": "cira-examples"
+        },
+        "conversation_id": "conv_02350245e640218e",
+        "captured_at": "2026-09-21T08:30:00.000Z",
+        "extracted_by": {
+          "method": "heuristic",
+          "agent": "cira.heuristic-statements@0.1.0"
+        },
+        "turn_id": "conv_02350245e640218e_t2",
+        "span": {
+          "start": 0,
+          "end": 39
+        }
+      },
+      "created_at": "2026-09-29T12:00:00.000Z"
+    },
+    {
+      "type": "task",
+      "status": "open",
+      "content": "Next step: add request validation with Zod.",
+      "confidence": 0.5,
+      "id": "itm_399e76e26515ede3",
+      "provenance": {
+        "source": {
+          "kind": "browser",
+          "platform": "claude",
+          "client": "cira-examples"
+        },
+        "conversation_id": "conv_02350245e640218e",
+        "captured_at": "2026-09-21T08:30:00.000Z",
+        "extracted_by": {
+          "method": "heuristic",
+          "agent": "cira.heuristic-statements@0.1.0"
+        },
+        "turn_id": "conv_02350245e640218e_t2",
+        "span": {
+          "start": 40,
+          "end": 83
+        }
+      },
+      "created_at": "2026-09-29T12:00:00.000Z"
+    },
+    {
+      "type": "question",
+      "content": "Should we store sessions in Redis?",
+      "confidence": 0.8,
+      "id": "itm_27a4390ec5808e2b",
+      "provenance": {
+        "source": {
+          "kind": "browser",
+          "platform": "claude",
+          "client": "cira-examples"
+        },
+        "conversation_id": "conv_02350245e640218e",
+        "captured_at": "2026-09-21T08:30:00.000Z",
+        "extracted_by": {
+          "method": "heuristic",
+          "agent": "cira.heuristic-statements@0.1.0"
+        },
+        "turn_id": "conv_02350245e640218e_t2",
+        "span": {
+          "start": 84,
+          "end": 118
+        }
+      },
+      "created_at": "2026-09-29T12:00:00.000Z"
+    }
+  ]
+}

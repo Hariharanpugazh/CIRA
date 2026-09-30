@@ -1,0 +1,305 @@
+{
+  "pco_version": "0.1",
+  "id": "pco_c9413f32186abcf3",
+  "metadata": {
+    "created_at": "2026-09-29T12:00:00.000Z",
+    "updated_at": "2026-09-29T12:00:00.000Z",
+    "created_by": {
+      "agent": "cira-examples"
+    },
+    "title": "Note-taking app sync"
+  },
+  "conversations": [
+    {
+      "id": "conv_98cb1511aeca8cbc",
+      "source": {
+        "kind": "browser",
+        "platform": "perplexity",
+        "client": "cira-examples"
+      },
+      "captured_at": "2026-09-24T09:15:00.000Z",
+      "turns": [
+        {
+          "id": "conv_98cb1511aeca8cbc_t0",
+          "index": 0,
+          "role": "user",
+          "content": "I'm working on a note-taking app. I'd rather keep the UI minimal. The app must support Markdown. What's the best way to sync notes between devices?"
+        },
+        {
+          "id": "conv_98cb1511aeca8cbc_t1",
+          "index": 1,
+          "role": "assistant",
+          "content": "You could use CRDTs. See [Automerge](https://automerge.org/) and https://crdt.tech for background.\n\n```js\nconst doc = Automerge.init();\n```"
+        },
+        {
+          "id": "conv_98cb1511aeca8cbc_t2",
+          "index": 2,
+          "role": "user",
+          "content": "Let's use Automerge. Please implement a sync prototype. Avoid any paid services."
+        }
+      ],
+      "title": "Note-taking app sync",
+      "url": "https://www.perplexity.ai/search/note-sync-5555"
+    }
+  ],
+  "items": [
+    {
+      "type": "fact",
+      "content": "I'm working on a note-taking app.",
+      "confidence": 0.5,
+      "id": "itm_3143c93a7b866161",
+      "provenance": {
+        "source": {
+          "kind": "browser",
+          "platform": "perplexity",
+          "client": "cira-examples"
+        },
+        "conversation_id": "conv_98cb1511aeca8cbc",
+        "captured_at": "2026-09-24T09:15:00.000Z",
+        "extracted_by": {
+          "method": "heuristic",
+          "agent": "cira.heuristic-statements@0.1.0"
+        },
+        "turn_id": "conv_98cb1511aeca8cbc_t0",
+        "span": {
+          "start": 0,
+          "end": 33
+        }
+      },
+      "created_at": "2026-09-29T12:00:00.000Z"
+    },
+    {
+      "type": "preference",
+      "content": "I'd rather keep the UI minimal.",
+      "confidence": 0.6,
+      "id": "itm_6b6e9375924098c2",
+      "provenance": {
+        "source": {
+          "kind": "browser",
+          "platform": "perplexity",
+          "client": "cira-examples"
+        },
+        "conversation_id": "conv_98cb1511aeca8cbc",
+        "captured_at": "2026-09-24T09:15:00.000Z",
+        "extracted_by": {
+          "method": "heuristic",
+          "agent": "cira.heuristic-statements@0.1.0"
+        },
+        "turn_id": "conv_98cb1511aeca8cbc_t0",
+        "span": {
+          "start": 34,
+          "end": 65
+        }
+      },
+      "created_at": "2026-09-29T12:00:00.000Z"
+    },
+    {
+      "type": "constraint",
+      "strength": "must",
+      "content": "The app must support Markdown.",
+      "confidence": 0.7,
+      "id": "itm_8188eea532f031c8",
+      "provenance": {
+        "source": {
+          "kind": "browser",
+          "platform": "perplexity",
+          "client": "cira-examples"
+        },
+        "conversation_id": "conv_98cb1511aeca8cbc",
+        "captured_at": "2026-09-24T09:15:00.000Z",
+        "extracted_by": {
+          "method": "heuristic",
+          "agent": "cira.heuristic-statements@0.1.0"
+        },
+        "turn_id": "conv_98cb1511aeca8cbc_t0",
+        "span": {
+          "start": 66,
+          "end": 96
+        }
+      },
+      "created_at": "2026-09-29T12:00:00.000Z"
+    },
+    {
+      "type": "question",
+      "content": "What's the best way to sync notes between devices?",
+      "confidence": 0.8,
+      "id": "itm_7c1e4a6a682d49bb",
+      "provenance": {
+        "source": {
+          "kind": "browser",
+          "platform": "perplexity",
+          "client": "cira-examples"
+        },
+        "conversation_id": "conv_98cb1511aeca8cbc",
+        "captured_at": "2026-09-24T09:15:00.000Z",
+        "extracted_by": {
+          "method": "heuristic",
+          "agent": "cira.heuristic-statements@0.1.0"
+        },
+        "turn_id": "conv_98cb1511aeca8cbc_t0",
+        "span": {
+          "start": 97,
+          "end": 147
+        }
+      },
+      "created_at": "2026-09-29T12:00:00.000Z"
+    },
+    {
+      "type": "code_artifact",
+      "content": "const doc = Automerge.init();",
+      "language": "js",
+      "confidence": 1,
+      "id": "itm_11902354298f77d9",
+      "provenance": {
+        "source": {
+          "kind": "browser",
+          "platform": "perplexity",
+          "client": "cira-examples"
+        },
+        "conversation_id": "conv_98cb1511aeca8cbc",
+        "captured_at": "2026-09-24T09:15:00.000Z",
+        "extracted_by": {
+          "method": "deterministic",
+          "agent": "cira.code-blocks@0.1.0"
+        },
+        "turn_id": "conv_98cb1511aeca8cbc_t1",
+        "span": {
+          "start": 100,
+          "end": 139
+        }
+      },
+      "created_at": "2026-09-29T12:00:00.000Z"
+    },
+    {
+      "type": "reference",
+      "content": "https://automerge.org/",
+      "uri": "https://automerge.org/",
+      "title": "Automerge",
+      "confidence": 1,
+      "id": "itm_c71f6fccce60ff5c",
+      "provenance": {
+        "source": {
+          "kind": "browser",
+          "platform": "perplexity",
+          "client": "cira-examples"
+        },
+        "conversation_id": "conv_98cb1511aeca8cbc",
+        "captured_at": "2026-09-24T09:15:00.000Z",
+        "extracted_by": {
+          "method": "deterministic",
+          "agent": "cira.references@0.1.0"
+        },
+        "turn_id": "conv_98cb1511aeca8cbc_t1",
+        "span": {
+          "start": 25,
+          "end": 60
+        }
+      },
+      "created_at": "2026-09-29T12:00:00.000Z"
+    },
+    {
+      "type": "reference",
+      "content": "https://crdt.tech",
+      "uri": "https://crdt.tech",
+      "confidence": 1,
+      "id": "itm_5a632a12a546ceda",
+      "provenance": {
+        "source": {
+          "kind": "browser",
+          "platform": "perplexity",
+          "client": "cira-examples"
+        },
+        "conversation_id": "conv_98cb1511aeca8cbc",
+        "captured_at": "2026-09-24T09:15:00.000Z",
+        "extracted_by": {
+          "method": "deterministic",
+          "agent": "cira.references@0.1.0"
+        },
+        "turn_id": "conv_98cb1511aeca8cbc_t1",
+        "span": {
+          "start": 65,
+          "end": 82
+        }
+      },
+      "created_at": "2026-09-29T12:00:00.000Z"
+    },
+    {
+      "type": "decision",
+      "status": "accepted",
+      "content": "Let's use Automerge.",
+      "confidence": 0.65,
+      "id": "itm_4848ee5811627120",
+      "provenance": {
+        "source": {
+          "kind": "browser",
+          "platform": "perplexity",
+          "client": "cira-examples"
+        },
+        "conversation_id": "conv_98cb1511aeca8cbc",
+        "captured_at": "2026-09-24T09:15:00.000Z",
+        "extracted_by": {
+          "method": "heuristic",
+          "agent": "cira.heuristic-statements@0.1.0"
+        },
+        "turn_id": "conv_98cb1511aeca8cbc_t2",
+        "span": {
+          "start": 0,
+          "end": 20
+        }
+      },
+      "created_at": "2026-09-29T12:00:00.000Z"
+    },
+    {
+      "type": "task",
+      "status": "open",
+      "content": "Please implement a sync prototype.",
+      "confidence": 0.5,
+      "id": "itm_e59b5c8124708dcb",
+      "provenance": {
+        "source": {
+          "kind": "browser",
+          "platform": "perplexity",
+          "client": "cira-examples"
+        },
+        "conversation_id": "conv_98cb1511aeca8cbc",
+        "captured_at": "2026-09-24T09:15:00.000Z",
+        "extracted_by": {
+          "method": "heuristic",
+          "agent": "cira.heuristic-statements@0.1.0"
+        },
+        "turn_id": "conv_98cb1511aeca8cbc_t2",
+        "span": {
+          "start": 21,
+          "end": 55
+        }
+      },
+      "created_at": "2026-09-29T12:00:00.000Z"
+    },
+    {
+      "type": "constraint",
+      "strength": "must_not",
+      "content": "Avoid any paid services.",
+      "confidence": 0.7,
+      "id": "itm_efa48d6ff5cc87c8",
+      "provenance": {
+        "source": {
+          "kind": "browser",
+          "platform": "perplexity",
+          "client": "cira-examples"
+        },
+        "conversation_id": "conv_98cb1511aeca8cbc",
+        "captured_at": "2026-09-24T09:15:00.000Z",
+        "extracted_by": {
+          "method": "heuristic",
+          "agent": "cira.heuristic-statements@0.1.0"
+        },
+        "turn_id": "conv_98cb1511aeca8cbc_t2",
+        "span": {
+          "start": 56,
+          "end": 80
+        }
+      },
+      "created_at": "2026-09-29T12:00:00.000Z"
+    }
+  ]
+}

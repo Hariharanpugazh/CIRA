@@ -1,0 +1,27 @@
+{
+  "name": "@cira/cli",
+  "version": "0.1.0",
+  "private": true,
+  "description": "cira — command-line connector for the CIRA context layer (validate, migrate, export and store Portable Context Objects).",
+  "license": "Apache-2.0",
+  "type": "module",
+  "bin": {
+    "cira": "./dist/cira.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "build": "node build.mjs",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@cira/core": "workspace:*"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  }
+}

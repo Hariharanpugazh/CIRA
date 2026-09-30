@@ -1,0 +1,5 @@
+# Normalise line endings. Snapshot/fixture files are compared byte-for-byte
+# in tests, so they must be LF on every platform.
+* text=auto eol=lf
+*.png binary
+*.ico binary

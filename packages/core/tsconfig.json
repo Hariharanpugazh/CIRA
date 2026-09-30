@@ -1,0 +1,12 @@
+{
+  // Environment-neutral core. `lib` is ES2022 only and `types` is empty, so any
+  // use of browser globals (window, document, chrome), Node globals (process,
+  // Buffer) or host APIs (URL, console, setTimeout) is a compile error.
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2022"],
+    "types": []
+  },
+  "include": ["src"],
+  "exclude": ["src/node"]
+}

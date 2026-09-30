@@ -1,0 +1,177 @@
+{
+  "pco_version": "0.1",
+  "id": "pco_da97417c57b26981",
+  "metadata": {
+    "created_at": "2026-09-29T12:00:00.000Z",
+    "updated_at": "2026-09-29T12:00:00.000Z",
+    "created_by": {
+      "agent": "cira-examples"
+    },
+    "title": "Project rules"
+  },
+  "conversations": [
+    {
+      "id": "conv_79be044820973fc4",
+      "source": {
+        "kind": "browser",
+        "platform": "gemini",
+        "client": "cira-examples"
+      },
+      "captured_at": "2026-09-22T12:00:00.000Z",
+      "turns": [
+        {
+          "id": "conv_79be044820973fc4_t0",
+          "index": 0,
+          "role": "user",
+          "content": "Rules for this project:\n- Never commit secrets to the repository.\n- The app must work offline.\n- You should prefer small pull requests.\n- Don't use class components in React.\n- Code should not depend on browser globals."
+        },
+        {
+          "id": "conv_79be044820973fc4_t1",
+          "index": 1,
+          "role": "assistant",
+          "content": "Got it, I will follow these rules."
+        },
+        {
+          "id": "conv_79be044820973fc4_t2",
+          "index": 2,
+          "role": "user",
+          "content": "I don't know if we need TypeScript strict mode."
+        }
+      ],
+      "title": "Project rules",
+      "url": "https://gemini.google.com/app/3333333333333333"
+    }
+  ],
+  "items": [
+    {
+      "type": "constraint",
+      "strength": "must_not",
+      "content": "Never commit secrets to the repository.",
+      "confidence": 0.7,
+      "id": "itm_ae9dd51a65ce9325",
+      "provenance": {
+        "source": {
+          "kind": "browser",
+          "platform": "gemini",
+          "client": "cira-examples"
+        },
+        "conversation_id": "conv_79be044820973fc4",
+        "captured_at": "2026-09-22T12:00:00.000Z",
+        "extracted_by": {
+          "method": "heuristic",
+          "agent": "cira.heuristic-statements@0.1.0"
+        },
+        "turn_id": "conv_79be044820973fc4_t0",
+        "span": {
+          "start": 26,
+          "end": 65
+        }
+      },
+      "created_at": "2026-09-29T12:00:00.000Z"
+    },
+    {
+      "type": "constraint",
+      "strength": "must",
+      "content": "The app must work offline.",
+      "confidence": 0.7,
+      "id": "itm_defa6a27792f1a17",
+      "provenance": {
+        "source": {
+          "kind": "browser",
+          "platform": "gemini",
+          "client": "cira-examples"
+        },
+        "conversation_id": "conv_79be044820973fc4",
+        "captured_at": "2026-09-22T12:00:00.000Z",
+        "extracted_by": {
+          "method": "heuristic",
+          "agent": "cira.heuristic-statements@0.1.0"
+        },
+        "turn_id": "conv_79be044820973fc4_t0",
+        "span": {
+          "start": 68,
+          "end": 94
+        }
+      },
+      "created_at": "2026-09-29T12:00:00.000Z"
+    },
+    {
+      "type": "constraint",
+      "strength": "should",
+      "content": "You should prefer small pull requests.",
+      "confidence": 0.55,
+      "id": "itm_edb7b5d337b7dba2",
+      "provenance": {
+        "source": {
+          "kind": "browser",
+          "platform": "gemini",
+          "client": "cira-examples"
+        },
+        "conversation_id": "conv_79be044820973fc4",
+        "captured_at": "2026-09-22T12:00:00.000Z",
+        "extracted_by": {
+          "method": "heuristic",
+          "agent": "cira.heuristic-statements@0.1.0"
+        },
+        "turn_id": "conv_79be044820973fc4_t0",
+        "span": {
+          "start": 97,
+          "end": 135
+        }
+      },
+      "created_at": "2026-09-29T12:00:00.000Z"
+    },
+    {
+      "type": "constraint",
+      "strength": "must_not",
+      "content": "Don't use class components in React.",
+      "confidence": 0.7,
+      "id": "itm_addd2b2d905c0e6e",
+      "provenance": {
+        "source": {
+          "kind": "browser",
+          "platform": "gemini",
+          "client": "cira-examples"
+        },
+        "conversation_id": "conv_79be044820973fc4",
+        "captured_at": "2026-09-22T12:00:00.000Z",
+        "extracted_by": {
+          "method": "heuristic",
+          "agent": "cira.heuristic-statements@0.1.0"
+        },
+        "turn_id": "conv_79be044820973fc4_t0",
+        "span": {
+          "start": 138,
+          "end": 174
+        }
+      },
+      "created_at": "2026-09-29T12:00:00.000Z"
+    },
+    {
+      "type": "constraint",
+      "strength": "should_not",
+      "content": "Code should not depend on browser globals.",
+      "confidence": 0.55,
+      "id": "itm_619b88a559fef1ec",
+      "provenance": {
+        "source": {
+          "kind": "browser",
+          "platform": "gemini",
+          "client": "cira-examples"
+        },
+        "conversation_id": "conv_79be044820973fc4",
+        "captured_at": "2026-09-22T12:00:00.000Z",
+        "extracted_by": {
+          "method": "heuristic",
+          "agent": "cira.heuristic-statements@0.1.0"
+        },
+        "turn_id": "conv_79be044820973fc4_t0",
+        "span": {
+          "start": 177,
+          "end": 219
+        }
+      },
+      "created_at": "2026-09-29T12:00:00.000Z"
+    }
+  ]
+}

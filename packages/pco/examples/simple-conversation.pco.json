@@ -1,0 +1,200 @@
+{
+  "pco_version": "0.1",
+  "id": "pco_66b8fd0a42c8b17b",
+  "metadata": {
+    "created_at": "2026-09-29T12:00:00.000Z",
+    "updated_at": "2026-09-29T12:00:00.000Z",
+    "created_by": {
+      "agent": "cira-examples"
+    },
+    "title": "Weekend trip planning"
+  },
+  "conversations": [
+    {
+      "id": "conv_2b4096e36f6e7765",
+      "source": {
+        "kind": "browser",
+        "platform": "chatgpt",
+        "client": "cira-examples"
+      },
+      "captured_at": "2026-09-20T10:00:00.000Z",
+      "turns": [
+        {
+          "id": "conv_2b4096e36f6e7765_t0",
+          "index": 0,
+          "role": "user",
+          "content": "I'm planning a weekend trip to Kyoto. I prefer quiet neighbourhoods over busy tourist areas. What are good places to stay?"
+        },
+        {
+          "id": "conv_2b4096e36f6e7765_t1",
+          "index": 1,
+          "role": "assistant",
+          "content": "Great choice. Consider staying in Higashiyama or near the Philosopher's Path. See https://www.japan-guide.com/e/e3900.html for an overview."
+        },
+        {
+          "id": "conv_2b4096e36f6e7765_t2",
+          "index": 2,
+          "role": "user",
+          "content": "Let's go with Higashiyama. I need to book a ryokan for two nights."
+        }
+      ],
+      "title": "Weekend trip planning",
+      "url": "https://chatgpt.com/c/11111111-1111-4111-8111-111111111111"
+    }
+  ],
+  "items": [
+    {
+      "type": "fact",
+      "content": "I'm planning a weekend trip to Kyoto.",
+      "confidence": 0.5,
+      "id": "itm_15922b9c85f4da6f",
+      "provenance": {
+        "source": {
+          "kind": "browser",
+          "platform": "chatgpt",
+          "client": "cira-examples"
+        },
+        "conversation_id": "conv_2b4096e36f6e7765",
+        "captured_at": "2026-09-20T10:00:00.000Z",
+        "extracted_by": {
+          "method": "heuristic",
+          "agent": "cira.heuristic-statements@0.1.0"
+        },
+        "turn_id": "conv_2b4096e36f6e7765_t0",
+        "span": {
+          "start": 0,
+          "end": 37
+        }
+      },
+      "created_at": "2026-09-29T12:00:00.000Z"
+    },
+    {
+      "type": "preference",
+      "content": "I prefer quiet neighbourhoods over busy tourist areas.",
+      "confidence": 0.6,
+      "id": "itm_363f0375a5a9cc31",
+      "provenance": {
+        "source": {
+          "kind": "browser",
+          "platform": "chatgpt",
+          "client": "cira-examples"
+        },
+        "conversation_id": "conv_2b4096e36f6e7765",
+        "captured_at": "2026-09-20T10:00:00.000Z",
+        "extracted_by": {
+          "method": "heuristic",
+          "agent": "cira.heuristic-statements@0.1.0"
+        },
+        "turn_id": "conv_2b4096e36f6e7765_t0",
+        "span": {
+          "start": 38,
+          "end": 92
+        }
+      },
+      "created_at": "2026-09-29T12:00:00.000Z"
+    },
+    {
+      "type": "question",
+      "content": "What are good places to stay?",
+      "confidence": 0.8,
+      "id": "itm_0d149f98b01c2402",
+      "provenance": {
+        "source": {
+          "kind": "browser",
+          "platform": "chatgpt",
+          "client": "cira-examples"
+        },
+        "conversation_id": "conv_2b4096e36f6e7765",
+        "captured_at": "2026-09-20T10:00:00.000Z",
+        "extracted_by": {
+          "method": "heuristic",
+          "agent": "cira.heuristic-statements@0.1.0"
+        },
+        "turn_id": "conv_2b4096e36f6e7765_t0",
+        "span": {
+          "start": 93,
+          "end": 122
+        }
+      },
+      "created_at": "2026-09-29T12:00:00.000Z"
+    },
+    {
+      "type": "reference",
+      "content": "https://www.japan-guide.com/e/e3900.html",
+      "uri": "https://www.japan-guide.com/e/e3900.html",
+      "confidence": 1,
+      "id": "itm_fff6614bc5f94465",
+      "provenance": {
+        "source": {
+          "kind": "browser",
+          "platform": "chatgpt",
+          "client": "cira-examples"
+        },
+        "conversation_id": "conv_2b4096e36f6e7765",
+        "captured_at": "2026-09-20T10:00:00.000Z",
+        "extracted_by": {
+          "method": "deterministic",
+          "agent": "cira.references@0.1.0"
+        },
+        "turn_id": "conv_2b4096e36f6e7765_t1",
+        "span": {
+          "start": 82,
+          "end": 122
+        }
+      },
+      "created_at": "2026-09-29T12:00:00.000Z"
+    },
+    {
+      "type": "decision",
+      "status": "accepted",
+      "content": "Let's go with Higashiyama.",
+      "confidence": 0.65,
+      "id": "itm_b73f64e699335d94",
+      "provenance": {
+        "source": {
+          "kind": "browser",
+          "platform": "chatgpt",
+          "client": "cira-examples"
+        },
+        "conversation_id": "conv_2b4096e36f6e7765",
+        "captured_at": "2026-09-20T10:00:00.000Z",
+        "extracted_by": {
+          "method": "heuristic",
+          "agent": "cira.heuristic-statements@0.1.0"
+        },
+        "turn_id": "conv_2b4096e36f6e7765_t2",
+        "span": {
+          "start": 0,
+          "end": 26
+        }
+      },
+      "created_at": "2026-09-29T12:00:00.000Z"
+    },
+    {
+      "type": "task",
+      "status": "open",
+      "content": "I need to book a ryokan for two nights.",
+      "confidence": 0.5,
+      "id": "itm_ad46ec3dcf150f1b",
+      "provenance": {
+        "source": {
+          "kind": "browser",
+          "platform": "chatgpt",
+          "client": "cira-examples"
+        },
+        "conversation_id": "conv_2b4096e36f6e7765",
+        "captured_at": "2026-09-20T10:00:00.000Z",
+        "extracted_by": {
+          "method": "heuristic",
+          "agent": "cira.heuristic-statements@0.1.0"
+        },
+        "turn_id": "conv_2b4096e36f6e7765_t2",
+        "span": {
+          "start": 27,
+          "end": 66
+        }
+      },
+      "created_at": "2026-09-29T12:00:00.000Z"
+    }
+  ]
+}

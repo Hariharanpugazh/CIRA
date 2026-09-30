@@ -1,0 +1,29 @@
+{
+  "name": "@cira/mcp",
+  "version": "0.1.0",
+  "private": true,
+  "description": "CIRA MCP server (stdio): exposes Portable Context Objects from ~/.cira/contexts to MCP-compatible agents.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "bin": {
+    "cira-mcp": "./dist/server.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "build": "node build.mjs",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@cira/core": "workspace:*",
+    "@modelcontextprotocol/sdk": "1.31.0",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  }
+}

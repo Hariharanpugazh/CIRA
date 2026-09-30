@@ -1,0 +1,25 @@
+{
+  "name": "@cira/core",
+  "version": "0.1.0",
+  "private": true,
+  "description": "CIRA Core — environment-neutral Portable Context Object (PCO) model, validation, encoding, decoding and storage interfaces.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./node": {
+      "types": "./src/node/index.ts",
+      "default": "./src/node/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.node.json && tsc -p tsconfig.test.json"
+  },
+  "dependencies": {
+    "zod": "4.6.5"
+  }
+}
