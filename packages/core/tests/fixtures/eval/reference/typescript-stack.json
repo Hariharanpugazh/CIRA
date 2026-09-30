@@ -1,0 +1,12 @@
+{
+  "items": [
+    { "ref": "i1", "type": "fact", "content": "The project is a TypeScript project", "origin": "user", "assertion": "explicit", "confidence": 0.95, "strength": null, "status": null, "language": null, "filename": null, "uri": null, "title": null, "evidence": [{ "message": "m0", "quote": "I'm building a TypeScript project." }] },
+    { "ref": "i2", "type": "preference", "content": "Prefers React and Tailwind", "origin": "user", "assertion": "explicit", "confidence": 0.95, "strength": null, "status": null, "language": null, "filename": null, "uri": null, "title": null, "evidence": [{ "message": "m0", "quote": "I prefer React and Tailwind." }] },
+    { "ref": "i3", "type": "constraint", "content": "The backend must use Django", "origin": "user", "assertion": "explicit", "confidence": 0.97, "strength": "must", "status": null, "language": null, "filename": null, "uri": null, "title": null, "evidence": [{ "message": "m0", "quote": "The backend must use Django." }] },
+    { "ref": "i4", "type": "constraint", "content": "Authentication is required", "origin": "user", "assertion": "explicit", "confidence": 0.97, "strength": "must", "status": null, "language": null, "filename": null, "uri": null, "title": null, "evidence": [{ "message": "m0", "quote": "Authentication is required." }] },
+    { "ref": "i5", "type": "decision", "content": "Use Django REST Framework for the backend", "origin": "assistant", "assertion": "suggested", "confidence": 0.9, "strength": null, "status": "proposed", "language": null, "filename": null, "uri": null, "title": null, "evidence": [{ "message": "m1", "quote": "Django REST Framework for backend." }] },
+    { "ref": "i6", "type": "decision", "content": "Use JWT authentication", "origin": "assistant", "assertion": "suggested", "confidence": 0.9, "strength": null, "status": "proposed", "language": null, "filename": null, "uri": null, "title": null, "evidence": [{ "message": "m1", "quote": "JWT authentication." }] },
+    { "ref": "i7", "type": "decision", "content": "Use PostgreSQL for the database", "origin": "assistant", "assertion": "suggested", "confidence": 0.85, "strength": null, "status": "proposed", "language": null, "filename": null, "uri": null, "title": null, "evidence": [{ "message": "m1", "quote": "You could use PostgreSQL for the database." }] }
+  ],
+  "relations": []
+}

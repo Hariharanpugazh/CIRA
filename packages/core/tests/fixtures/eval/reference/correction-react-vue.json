@@ -1,0 +1,7 @@
+{
+  "items": [
+    { "ref": "i1", "type": "fact", "content": "Uses React for the frontend", "origin": "user", "assertion": "explicit", "confidence": 0.95, "strength": null, "status": null, "language": null, "filename": null, "uri": null, "title": null, "evidence": [{ "message": "m0", "quote": "I use React for the frontend." }] },
+    { "ref": "i2", "type": "fact", "content": "Switched to Vue for the frontend", "origin": "user", "assertion": "explicit", "confidence": 0.95, "strength": null, "status": null, "language": null, "filename": null, "uri": null, "title": null, "evidence": [{ "message": "m2", "quote": "I switched to Vue last week." }] }
+  ],
+  "relations": [{ "type": "supersedes", "from": "i2", "to": "i1" }]
+}

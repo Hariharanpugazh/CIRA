@@ -1,0 +1,7 @@
+{
+  "items": [
+    { "ref": "i1", "type": "constraint", "content": "The backend must use Django", "origin": "user", "assertion": "explicit", "confidence": 0.97, "strength": "must", "status": null, "language": null, "filename": null, "uri": null, "title": null, "evidence": [{ "message": "m0", "quote": "I need the backend to use Django." }] },
+    { "ref": "i2", "type": "decision", "content": "FastAPI could be used instead", "origin": "assistant", "assertion": "suggested", "confidence": 0.9, "strength": null, "status": "proposed", "language": null, "filename": null, "uri": null, "title": null, "evidence": [{ "message": "m1", "quote": "You could use FastAPI instead." }] }
+  ],
+  "relations": []
+}

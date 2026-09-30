@@ -10,8 +10,13 @@ packages/core/src/
 ├── types/         TypeScript types inferred from the schema (discriminated ContextItem union)
 ├── validation/    validate() structural + semantic, upgrade() version chain, parsePco()
 ├── provenance/    createProvenance(), resolveProvenance(), describeProvenance(), explainItem()
-├── encoder/       encode(), pluggable ItemExtractor, deterministic + heuristic extractors
-├── decoder/       decode() → DecodedContext, renderMarkdown()
+├── encoder/       encode(), pluggable per-turn ItemExtractor rules (deterministic + heuristic)
+├── semantic/      Phase 02: ContextExtractor interface, deterministic + semantic extractors,
+│                  model-output contract, attribution rules, StructuredOutputProvider
+│                  (OpenAI-compatible, scripted), reconcile(), extractContext() modes,
+│                  extensions["cira.semantic"] annotations (see semantic-engine.md)
+├── evaluation/    gold fixtures → precision/recall/F1, attribution, provenance (CIRA-Bench foundation)
+├── decoder/       decode() → DecodedContext (optional origin filter, annotations), renderMarkdown()
 ├── migration/     legacy CIRA v0 conversation → encoder input / PCO
 ├── selection/     Compressor interface + the legacy rule-based relay compressor (unchanged output)
 ├── safety/        secret detector (regex + entropy) and scanDocument()

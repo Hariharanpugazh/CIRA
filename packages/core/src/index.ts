@@ -24,6 +24,20 @@ export {
 export { codeBlockExtractor, referenceExtractor } from './encoder/extractors/deterministic';
 export { heuristicStatementExtractor, RULE_CONFIDENCE } from './encoder/extractors/heuristic';
 
+export { dedupeItems, assembleDocument } from './encoder/encode';
+
+export * from './semantic/annotations';
+export * from './semantic/types';
+export * from './semantic/deterministic-extractor';
+export * from './semantic/evidence';
+export * from './semantic/contract';
+export * from './semantic/provider';
+export * from './semantic/semantic-extractor';
+export * from './semantic/reconcile';
+export * from './semantic/pipeline';
+
+export * from './evaluation/evaluate';
+
 export * from './decoder/decode';
 export * from './decoder/render-markdown';
 

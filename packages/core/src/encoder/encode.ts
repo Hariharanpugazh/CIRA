@@ -57,7 +57,7 @@ export function deriveConversationId(input: Pick<ConversationInput, 'source' | '
   return makeId('conv', input.source.platform, input.url, input.captured_at, input.title);
 }
 
-function toIso(now: Date | string | undefined): string {
+export function toIso(now: Date | string | undefined): string {
   if (now === undefined) return new Date().toISOString();
   return typeof now === 'string' ? now : now.toISOString();
 }
@@ -118,6 +118,25 @@ export function extractItems(
   return items;
 }
 
+/**
+ * Phase 01 de-duplication: keep the first item per type + normalised content
+ * (code by language + code, references by URI), then guarantee unique IDs.
+ */
+export function dedupeItems(items: readonly ContextItem[], byContent = true): ContextItem[] {
+  let out = [...items];
+  if (byContent) {
+    const seen = new Set<string>();
+    out = out.filter((item) => {
+      const key = dedupeKey(item);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }
+  const ids = new Set<string>();
+  return out.filter((i) => (ids.has(i.id) ? false : (ids.add(i.id), true)));
+}
+
 export function encode(input: ConversationInput | readonly ConversationInput[], options: EncodeOptions = {}): PCODocument {
   const inputs = Array.isArray(input) ? input : [input as ConversationInput];
   const now = toIso(options.now);
@@ -125,20 +144,17 @@ export function encode(input: ConversationInput | readonly ConversationInput[], 
 
   const conversations = inputs.map(buildConversation);
 
-  let items = conversations.flatMap((c) => extractItems(c, extractors, now));
-  if (options.dedupe !== false) {
-    const seen = new Set<string>();
-    items = items.filter((item) => {
-      const key = dedupeKey(item);
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-  }
-  // Guarantee ID uniqueness even for pathological inputs.
-  const ids = new Set<string>();
-  items = items.filter((i) => (ids.has(i.id) ? false : (ids.add(i.id), true)));
+  const items = dedupeItems(conversations.flatMap((c) => extractItems(c, extractors, now)), options.dedupe !== false);
+  return assembleDocument(conversations, items, now, options);
+}
 
+/** Build the PCO envelope around conversations + items (shared by encode() and extractContext()). */
+export function assembleDocument(
+  conversations: PcoConversation[],
+  items: ContextItem[],
+  now: string,
+  options: Pick<EncodeOptions, 'id' | 'title' | 'description' | 'createdBy' | 'extensions'> = {},
+): PCODocument {
   const title = options.title ?? (conversations.length === 1 ? conversations[0].title : undefined);
   const doc: PCODocument = {
     pco_version: PCO_VERSION,

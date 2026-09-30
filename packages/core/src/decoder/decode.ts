@@ -9,6 +9,7 @@
 import { CONTEXT_ITEM_TYPES } from '../pco/schema';
 import { resolveProvenance, type ResolvedProvenance } from '../provenance';
 import type { ContextItem, ContextItemType, ExtractionMethod, PCODocument, SourceRef } from '../types';
+import { getSemanticExtension, type Origin, type SemanticAnnotation } from '../semantic/annotations';
 
 /** Presentation order: what an agent most needs to respect comes first. */
 export const SECTION_ORDER: readonly ContextItemType[] = [
@@ -40,11 +41,19 @@ export interface DecodeOptions {
   minConfidence?: number;
   /** Only include items whose provenance points at these conversations. */
   conversationIds?: readonly string[];
+  /**
+   * Only include items introduced by these speakers (semantic annotation, or
+   * the role of the source turn when a document has no annotations), e.g.
+   * ["user"] for user-owned context only.
+   */
+  origins?: readonly Origin[];
 }
 
 export interface DecodedItem<T extends ContextItem = ContextItem> {
   item: T;
   provenance: ResolvedProvenance;
+  /** Present when the document carries `extensions["cira.semantic"]`. */
+  annotation?: SemanticAnnotation;
 }
 
 export interface DecodedSection {
@@ -88,17 +97,24 @@ export function decode(doc: PCODocument, options: DecodeOptions = {}): DecodedCo
   const convIds = options.conversationIds ? new Set(options.conversationIds) : undefined;
   const minConfidence = options.minConfidence ?? 0;
 
+  const semantic = getSemanticExtension(doc);
+  const origins = options.origins ? new Set(options.origins) : undefined;
+  const originOf = (item: ContextItem): Origin =>
+    semantic?.items[item.id]?.origin ?? resolveProvenance(doc, item).role ?? 'unknown';
+
   const selected = doc.items.filter(
     (item) =>
       (!types || types.has(item.type)) &&
       item.confidence >= minConfidence &&
-      (!convIds || (item.provenance.conversation_id !== undefined && convIds.has(item.provenance.conversation_id))),
+      (!convIds || (item.provenance.conversation_id !== undefined && convIds.has(item.provenance.conversation_id))) &&
+      (!origins || origins.has(originOf(item))),
   );
 
   const byType = new Map<ContextItemType, DecodedItem[]>();
   for (const item of selected) {
     const list = byType.get(item.type) ?? [];
-    list.push({ item, provenance: resolveProvenance(doc, item) });
+    const annotation = semantic?.items[item.id];
+    list.push({ item, provenance: resolveProvenance(doc, item), ...(annotation ? { annotation } : {}) });
     byType.set(item.type, list);
   }
 

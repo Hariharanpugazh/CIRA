@@ -1,0 +1,20 @@
+{
+  "id": "correction-react-vue",
+  "description": "A later user correction is kept alongside the earlier statement (both with evidence).",
+  "conversation": {
+    "source": "chatgpt",
+    "title": "Frontend",
+    "url": "https://chatgpt.com/c/eval-react-vue",
+    "capturedAt": "2026-09-30T09:00:00.000Z",
+    "messages": [
+      { "role": "user", "content": "I use React for the frontend." },
+      { "role": "assistant", "content": "Nice, React has a large ecosystem." },
+      { "role": "user", "content": "Actually, I switched to Vue last week." }
+    ]
+  },
+  "expected": [
+    { "type": "fact", "origin": "user", "message": 0, "match": ["react"] },
+    { "type": "fact", "origin": "user", "message": 2, "match": ["vue"] }
+  ],
+  "forbidden": []
+}

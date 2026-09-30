@@ -54,7 +54,7 @@ Every consumer, whether that's the extension, the CLI, the native host or the MC
 - **PCO is representation; compression is an optimisation.** The PCO keeps the full transcript plus extracted items with provenance. Compressors, including the legacy relay compressor, sit behind `Compressor` in `core/src/selection` and never change stored data.
 - **Storage is an interface.** Core defines `ContextStore`. The implementations are in-memory, key/value (used for `chrome.storage`), and file (Node). SQLite, IndexedDB and encrypted sync can be added without touching Core's model.
 - **Local-first and explicit.** Context reaches disk only through a native messaging host that the user installs, allow-listed for one extension ID. The MCP server is stdio-only and read-only, and opens no network port.
-- **Honest extraction.** Every item records `extracted_by.method` (`deterministic`, `heuristic`, `manual`, `model` or `migration`) and a confidence value. Phase 01 has no model-based extraction.
+- **Honest extraction.** Every item records `extracted_by.method` (`deterministic`, `heuristic`, `manual`, `model` or `migration`) and a confidence value. Phase 02 adds optional model-based extraction behind the provider-agnostic `ContextExtractor` interface. It is evidence-backed and attribution-aware, and deterministic remains the default; see [semantic-engine.md](semantic-engine.md).
 
 ## Adding a new environment (no Core changes required)
 

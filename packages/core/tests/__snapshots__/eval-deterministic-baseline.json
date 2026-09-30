@@ -1,0 +1,77 @@
+{
+  "per_fixture": {
+    "correction-react-vue": {
+      "gold": 2,
+      "predicted": 0,
+      "matched": 0,
+      "origin_correct": 0,
+      "provenance_correct": 0,
+      "unsupported": 0,
+      "forbidden": 0,
+      "f1": 0
+    },
+    "django-vs-fastapi": {
+      "gold": 2,
+      "predicted": 0,
+      "matched": 0,
+      "origin_correct": 0,
+      "provenance_correct": 0,
+      "unsupported": 0,
+      "forbidden": 0,
+      "f1": 0
+    },
+    "postgres-preference": {
+      "gold": 2,
+      "predicted": 1,
+      "matched": 1,
+      "origin_correct": 1,
+      "provenance_correct": 1,
+      "unsupported": 0,
+      "forbidden": 0,
+      "f1": 0.667
+    },
+    "selection-boundary": {
+      "gold": 2,
+      "predicted": 2,
+      "matched": 2,
+      "origin_correct": 2,
+      "provenance_correct": 2,
+      "unsupported": 0,
+      "forbidden": 0,
+      "f1": 1
+    },
+    "system-and-tasks": {
+      "gold": 7,
+      "predicted": 5,
+      "matched": 5,
+      "origin_correct": 5,
+      "provenance_correct": 5,
+      "unsupported": 0,
+      "forbidden": 0,
+      "f1": 0.833
+    },
+    "typescript-stack": {
+      "gold": 7,
+      "predicted": 4,
+      "matched": 4,
+      "origin_correct": 4,
+      "provenance_correct": 4,
+      "unsupported": 0,
+      "forbidden": 0,
+      "f1": 0.727
+    }
+  },
+  "total": {
+    "gold": 22,
+    "predicted": 12,
+    "matched": 12,
+    "origin_correct": 12,
+    "provenance_correct": 12,
+    "unsupported": 0,
+    "forbidden": 0,
+    "precision": 1,
+    "recall": 0.545,
+    "f1": 0.706,
+    "attribution_accuracy": 1
+  }
+}

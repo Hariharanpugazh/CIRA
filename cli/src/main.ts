@@ -1,9 +1,10 @@
 import { fileURLToPath } from 'node:url';
 import { parseArgs, type ParseArgsConfig } from 'node:util';
 import { existsSync } from 'node:fs';
-import { PCO_VERSION } from '@cira/core';
+import { PCO_VERSION, type HttpTransport } from '@cira/core';
 import { defaultContextDir, FileContextStore } from '@cira/core/node';
 import { cmdExport, cmdList, cmdMigrate, cmdSave, cmdValidate } from './commands/documents';
+import { cmdEval, cmdExtract } from './commands/extract';
 import { CliError, UsageError, type CliIO } from './io';
 import { runHost } from './native/host';
 import { applyInstall, applyUninstall, parseBrowser, planInstall, readComSpecState, registryValue, type Exec } from './native/install';
@@ -18,6 +19,9 @@ Usage:
   cira export   <file.pco.json | id> [--format md|json|pco] [--types t1,t2] [--min-confidence 0..1] [--no-provenance] [-o <file>]
   cira save     <file.pco.json>
   cira list     [--json]
+  cira extract  <legacy.json | file.pco.json> [--mode deterministic|semantic|hybrid] [--messages 1,3,5-7]
+                [-o <out.pco.json>] [--stdout] [--save] [--model <m>] [--base-url <url>] [--allow-remote]
+  cira eval     <fixture.eval.json | dir>... [--mode ...] [--replay <dir>] [--json]
   cira native-host install --extension-id <id> [--extension-id <id2>] [--browser chrome|edge|chromium|brave] [--dry-run]
   cira native-host uninstall [--browser ...]
   cira native-host status [--browser ...]
@@ -28,7 +32,17 @@ Options:
   -v, --version  Show version
 
 Context types: fact, decision, constraint, preference, task, question, code_artifact, reference
-Extraction is deterministic (code, links) + heuristic (keyword rules); see docs/pco/specification.md.
+
+Extraction modes (default deterministic; see docs/architecture/semantic-engine.md):
+  deterministic  Phase 01 rules only (code, links, keyword heuristics). Nothing leaves this machine.
+  semantic       A structured-output model extracts evidence-backed, attributed items.
+  hybrid         Both, reconciled; falls back to deterministic if the model fails.
+Semantic provider (OpenAI-compatible Chat Completions: Ollama, LM Studio, vLLM, OpenAI, …):
+  --model / CIRA_SEMANTIC_MODEL, --base-url / CIRA_SEMANTIC_BASE_URL (default http://127.0.0.1:11434/v1),
+  CIRA_SEMANTIC_API_KEY (environment only), --response-format json_schema|json_object.
+  --timeout <seconds> per model request (default 120; CIRA_SEMANTIC_TIMEOUT).
+  Non-loopback endpoints require --allow-remote; selections with potential secrets also need --allow-secrets.
+  Only the selected messages (--messages) are sent.
 `;
 
 const OPTIONS = {
@@ -46,7 +60,24 @@ const OPTIONS = {
   'extension-id': { type: 'string', multiple: true },
   browser: { type: 'string' },
   'dry-run': { type: 'boolean' },
+  mode: { type: 'string' },
+  messages: { type: 'string' },
+  model: { type: 'string' },
+  'base-url': { type: 'string' },
+  'response-format': { type: 'string' },
+  'allow-remote': { type: 'boolean' },
+  'allow-secrets': { type: 'boolean' },
+  replay: { type: 'string' },
+  timeout: { type: 'string' },
 } satisfies ParseArgsConfig['options'];
+
+/** --timeout <seconds> (semantic provider request timeout). */
+function parseTimeout(value: string | undefined): number | undefined {
+  if (value === undefined) return undefined;
+  const s = Number(value);
+  if (!Number.isFinite(s) || s <= 0) throw new UsageError('--timeout must be a positive number of seconds');
+  return Math.round(s * 1000);
+}
 
 function need(positionals: string[], index: number, what: string): string {
   const v = positionals[index];
@@ -63,6 +94,8 @@ export interface RunOptions {
   rawStdout?: NodeJS.WritableStream;
   /** Runs `reg` / `setx` (argument arrays, no shell). Injectable for tests. */
   exec?: Exec;
+  /** HTTP transport for the semantic provider (tests inject a fake). */
+  transport?: HttpTransport;
 }
 
 export async function run(argv: string[], io: CliIO, options: RunOptions = {}): Promise<number> {
@@ -115,6 +148,43 @@ export async function run(argv: string[], io: CliIO, options: RunOptions = {}): 
       return cmdSave(io, { file: need(p, 1, '<file>'), dir: v.dir });
     case 'list':
       return cmdList(io, { json: !!v.json, dir: v.dir });
+    case 'extract':
+      return cmdExtract(
+        io,
+        {
+          file: need(p, 1, '<input>'),
+          mode: v.mode,
+          messages: v.messages,
+          output: v.output,
+          stdout: !!v.stdout,
+          save: !!v.save,
+          dir: v.dir,
+          model: v.model,
+          baseUrl: v['base-url'],
+          responseFormat: v['response-format'],
+          timeoutMs: parseTimeout(v.timeout),
+          allowRemote: !!v['allow-remote'],
+          allowSecrets: !!v['allow-secrets'],
+        },
+        options.transport,
+      );
+    case 'eval':
+      if (p.length < 2) throw new UsageError('missing <fixture.eval.json | dir>');
+      return cmdEval(
+        io,
+        {
+          paths: p.slice(1),
+          mode: v.mode,
+          replay: v.replay,
+          json: !!v.json,
+          model: v.model,
+          baseUrl: v['base-url'],
+          responseFormat: v['response-format'],
+          timeoutMs: parseTimeout(v.timeout),
+          allowRemote: !!v['allow-remote'],
+        },
+        options.transport,
+      );
     case 'native-host':
       return nativeHostCommand(p[1], v, io, options);
     default:

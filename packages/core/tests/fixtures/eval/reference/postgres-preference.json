@@ -1,0 +1,7 @@
+{
+  "items": [
+    { "ref": "i1", "type": "preference", "content": "Prefers PostgreSQL", "origin": "user", "assertion": "explicit", "confidence": 0.97, "strength": null, "status": null, "language": null, "filename": null, "uri": null, "title": null, "evidence": [{ "message": "m0", "quote": "I prefer PostgreSQL." }] },
+    { "ref": "i2", "type": "decision", "content": "MongoDB may be easier for a document-heavy app", "origin": "assistant", "assertion": "suggested", "confidence": 0.85, "strength": null, "status": "proposed", "language": null, "filename": null, "uri": null, "title": null, "evidence": [{ "message": "m1", "quote": "MongoDB may be easier for a document-heavy app." }] }
+  ],
+  "relations": []
+}

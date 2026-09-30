@@ -5,6 +5,8 @@ import {
   CONTEXT_ITEM_TYPES,
   decode,
   formatIssue,
+  getSemanticExtension,
+  validateSemanticExtension,
   fromLegacyConversation,
   encode,
   isContextItemType,
@@ -21,7 +23,7 @@ import { CliError, openStore, readJson, UsageError, type CliIO } from '../io';
 
 export const CLI_AGENT = 'cira-cli@0.1.0';
 
-function reportSafety(io: CliIO, doc: PCODocument): void {
+export function reportSafety(io: CliIO, doc: PCODocument): void {
   const report = scanDocument(doc);
   if (!report.hasFindings) return;
   io.stderr(`\nSAFETY WARNING: ${report.findings.length} potential secret(s) detected in this context.\n`);
@@ -64,6 +66,11 @@ export async function cmdValidate(io: CliIO, args: { file: string; json: boolean
   io.stdout(
     `VALID: ${args.file}\n  PCO v${d.pco_version} · id ${d.id}\n  ${d.conversations.length} conversation(s), ${d.conversations.reduce((n, c) => n + c.turns.length, 0)} turn(s), ${d.items.length} context item(s)\n`,
   );
+  // Semantic metadata is an extension: problems there are warnings, never PCO errors.
+  const ext = getSemanticExtension(d);
+  const semanticIssues = validateSemanticExtension(d);
+  if (ext) io.stdout(`  semantic extension: mode ${ext.mode}, ${ext.extractors.map((e) => `${e.id}@${e.version}`).join(' + ')}\n`);
+  for (const i of semanticIssues) io.stdout(`WARNING semantic_${i.code}: ${i.message}\n`);
   return 0;
 }
 

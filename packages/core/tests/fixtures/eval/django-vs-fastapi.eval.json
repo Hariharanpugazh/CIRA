@@ -1,0 +1,22 @@
+{
+  "id": "django-vs-fastapi",
+  "description": "An assistant alternative must not replace the user's explicit requirement.",
+  "conversation": {
+    "source": "claude",
+    "title": "Backend framework",
+    "url": "https://claude.ai/chat/eval-django-fastapi",
+    "capturedAt": "2026-09-30T09:00:00.000Z",
+    "messages": [
+      { "role": "user", "content": "I need the backend to use Django." },
+      { "role": "assistant", "content": "You could use FastAPI instead. It is faster for pure APIs." }
+    ]
+  },
+  "expected": [
+    { "type": "constraint", "origin": "user", "message": 0, "match": ["django"] },
+    { "type": "decision", "origin": "assistant", "message": 1, "match": ["fastapi"], "note": "suggestion" }
+  ],
+  "forbidden": [
+    { "type": "constraint", "origin": "user", "match": ["fastapi"], "reason": "assistant alternative recorded as the user's backend requirement" },
+    { "type": "decision", "origin": "user", "match": ["fastapi"], "reason": "assistant alternative recorded as a user decision" }
+  ]
+}

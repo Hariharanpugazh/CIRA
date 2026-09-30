@@ -1,0 +1,28 @@
+{
+  "id": "typescript-stack",
+  "description": "User-owned facts, preferences and requirements vs assistant-generated suggestions.",
+  "conversation": {
+    "source": "chatgpt",
+    "title": "Stack for my app",
+    "url": "https://chatgpt.com/c/eval-typescript-stack",
+    "capturedAt": "2026-09-30T09:00:00.000Z",
+    "messages": [
+      { "role": "user", "content": "I'm building a TypeScript project. I prefer React and Tailwind. The backend must use Django. Authentication is required." },
+      { "role": "assistant", "content": "React + TypeScript + Tailwind for frontend. Django REST Framework for backend. JWT authentication. You could use PostgreSQL for the database." }
+    ]
+  },
+  "expected": [
+    { "type": "fact", "origin": "user", "message": 0, "match": ["typescript"] },
+    { "type": "preference", "origin": "user", "message": 0, "match": ["react", "tailwind"] },
+    { "type": "constraint", "origin": "user", "message": 0, "match": ["django"] },
+    { "type": "constraint", "origin": "user", "message": 0, "match": ["authentication"] },
+    { "type": "decision", "origin": "assistant", "message": 1, "match": ["rest framework"], "note": "suggestion" },
+    { "type": "decision", "origin": "assistant", "message": 1, "match": ["jwt"], "note": "suggestion" },
+    { "type": "decision", "origin": "assistant", "message": 1, "match": ["postgresql"], "note": "suggestion" }
+  ],
+  "forbidden": [
+    { "type": "constraint", "origin": "user", "match": ["jwt"], "reason": "assistant suggestion recorded as a user requirement" },
+    { "type": "constraint", "origin": "user", "match": ["postgresql"], "reason": "assistant suggestion recorded as a user requirement" },
+    { "type": "preference", "origin": "user", "match": ["postgresql"], "reason": "assistant suggestion recorded as a user preference" }
+  ]
+}

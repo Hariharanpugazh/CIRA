@@ -1,0 +1,27 @@
+{
+  "id": "system-and-tasks",
+  "description": "System instructions, explicit requirements, open questions, tasks, code and links.",
+  "conversation": {
+    "source": "chatgpt",
+    "title": "Offline notes app",
+    "url": "https://chatgpt.com/c/eval-system-tasks",
+    "capturedAt": "2026-09-30T09:00:00.000Z",
+    "messages": [
+      { "role": "system", "content": "Always answer in English." },
+      { "role": "user", "content": "The app must work offline. What database should we use? Next step: add a sync prototype." },
+      { "role": "assistant", "content": "Use IndexedDB in the browser. See https://developer.mozilla.org/docs/Web/API/IndexedDB_API for details.\n\n```ts\nconst db = indexedDB.open('notes');\n```" }
+    ]
+  },
+  "expected": [
+    { "type": "constraint", "origin": "system", "message": 0, "match": ["english"] },
+    { "type": "constraint", "origin": "user", "message": 1, "match": ["offline"] },
+    { "type": "question", "origin": "user", "message": 1, "match": ["database"] },
+    { "type": "task", "origin": "user", "message": 1, "match": ["sync prototype"] },
+    { "type": "decision", "origin": "assistant", "message": 2, "match": ["indexeddb"], "note": "suggestion" },
+    { "type": "reference", "origin": "assistant", "message": 2, "match": ["developer.mozilla.org"] },
+    { "type": "code_artifact", "origin": "assistant", "message": 2, "match": ["indexeddb.open"] }
+  ],
+  "forbidden": [
+    { "type": "constraint", "origin": "user", "match": ["indexeddb"], "reason": "assistant suggestion recorded as a user requirement" }
+  ]
+}

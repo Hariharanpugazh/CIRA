@@ -1,0 +1,22 @@
+{
+  "id": "postgres-preference",
+  "description": "A user preference is not overwritten by an assistant recommendation.",
+  "conversation": {
+    "source": "gemini",
+    "title": "Database",
+    "url": "https://gemini.google.com/app/eval-postgres",
+    "capturedAt": "2026-09-30T09:00:00.000Z",
+    "messages": [
+      { "role": "user", "content": "I prefer PostgreSQL." },
+      { "role": "assistant", "content": "MongoDB may be easier for a document-heavy app." }
+    ]
+  },
+  "expected": [
+    { "type": "preference", "origin": "user", "message": 0, "match": ["postgresql"] },
+    { "type": "decision", "origin": "assistant", "message": 1, "match": ["mongodb"], "note": "suggestion" }
+  ],
+  "forbidden": [
+    { "type": "preference", "origin": "user", "match": ["mongodb"], "reason": "assistant recommendation recorded as the user's preference" },
+    { "type": "preference", "origin": "assistant", "match": ["mongodb"], "reason": "assistants do not hold preferences" }
+  ]
+}

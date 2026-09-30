@@ -22,6 +22,42 @@ cira export <id> --format json               # decoded context (sections + resol
 cira export <id> --format pco                # the raw validated PCO
 ```
 
+## Semantic extraction (Phase 02)
+
+`cira extract` runs the extraction pipeline without the browser. The default mode is `deterministic`: the Phase 01 rules, with the same output as `migrate`, and nothing leaves the machine.
+
+```powershell
+cira extract chat.json                                         # deterministic
+cira extract chat.json --mode hybrid --model qwen2.5:7b        # rules + local model (Ollama at 127.0.0.1:11434/v1)
+cira extract chat.json --mode semantic --messages 2,5-7 --model qwen2.5:7b   # only messages 2, 5, 6, 7 are sent
+cira extract ctx.pco.json --mode hybrid --model m              # re-extract a PCO → ctx.hybrid.pco.json
+
+$env:CIRA_SEMANTIC_API_KEY = '…'                               # environment only, never a flag
+cira extract chat.json --mode semantic --model gpt-4o-mini --base-url https://api.openai.com/v1 --allow-remote
+
+cira eval packages/core/tests/fixtures/eval                    # score the deterministic baseline
+cira eval packages/core/tests/fixtures/eval --mode hybrid --model qwen2.5:7b
+cira eval <dir> --mode semantic --replay <recorded-outputs-dir>
+```
+
+The provider is any OpenAI-compatible Chat Completions endpoint: Ollama, LM Studio, vLLM, llama.cpp, OpenAI, Groq and others. Configure it with flags or environment variables:
+
+| Setting | Flag | Environment variable | Default |
+|---|---|---|---|
+| Model | `--model` | `CIRA_SEMANTIC_MODEL` | none (required for semantic/hybrid) |
+| Endpoint | `--base-url` | `CIRA_SEMANTIC_BASE_URL` | `http://127.0.0.1:11434/v1` |
+| API key | (none) | `CIRA_SEMANTIC_API_KEY` | none |
+| Output format | `--response-format json_schema\|json_object` | `CIRA_SEMANTIC_RESPONSE_FORMAT` | `json_schema` |
+| Request timeout | `--timeout <s>` | `CIRA_SEMANTIC_TIMEOUT` | 120 s |
+
+Safeguards:
+
+- Non-loopback endpoints are refused unless you pass `--allow-remote`.
+- Selections with potential secrets are not sent to a remote endpoint unless you pass `--allow-secrets`.
+- API keys never appear in output, logs or PCO files.
+
+See [docs/architecture/semantic-engine.md](../docs/architecture/semantic-engine.md).
+
 Global options:
 
 - `--dir <path>` overrides the store directory.

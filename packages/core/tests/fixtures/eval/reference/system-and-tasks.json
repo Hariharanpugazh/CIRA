@@ -1,0 +1,12 @@
+{
+  "items": [
+    { "ref": "i1", "type": "constraint", "content": "Always answer in English", "origin": "system", "assertion": "explicit", "confidence": 0.97, "strength": "must", "status": null, "language": null, "filename": null, "uri": null, "title": null, "evidence": [{ "message": "m0", "quote": "Always answer in English." }] },
+    { "ref": "i2", "type": "constraint", "content": "The app must work offline", "origin": "user", "assertion": "explicit", "confidence": 0.97, "strength": "must", "status": null, "language": null, "filename": null, "uri": null, "title": null, "evidence": [{ "message": "m1", "quote": "The app must work offline." }] },
+    { "ref": "i3", "type": "question", "content": "Which database should be used?", "origin": "user", "assertion": "explicit", "confidence": 0.9, "strength": null, "status": "open", "language": null, "filename": null, "uri": null, "title": null, "evidence": [{ "message": "m1", "quote": "What database should we use?" }] },
+    { "ref": "i4", "type": "task", "content": "Add a sync prototype", "origin": "user", "assertion": "explicit", "confidence": 0.9, "strength": null, "status": "open", "language": null, "filename": null, "uri": null, "title": null, "evidence": [{ "message": "m1", "quote": "Next step: add a sync prototype." }] },
+    { "ref": "i5", "type": "decision", "content": "Use IndexedDB in the browser", "origin": "assistant", "assertion": "suggested", "confidence": 0.85, "strength": null, "status": "proposed", "language": null, "filename": null, "uri": null, "title": null, "evidence": [{ "message": "m2", "quote": "Use IndexedDB in the browser." }] },
+    { "ref": "i6", "type": "reference", "content": "MDN IndexedDB API docs", "origin": "assistant", "assertion": "explicit", "confidence": 0.95, "strength": null, "status": null, "language": null, "filename": null, "uri": "https://developer.mozilla.org/docs/Web/API/IndexedDB_API", "title": "IndexedDB API", "evidence": [{ "message": "m2", "quote": "https://developer.mozilla.org/docs/Web/API/IndexedDB_API" }] },
+    { "ref": "i7", "type": "code_artifact", "content": "const db = indexedDB.open('notes');", "origin": "assistant", "assertion": "explicit", "confidence": 0.95, "strength": null, "status": null, "language": "ts", "filename": null, "uri": null, "title": null, "evidence": [{ "message": "m2", "quote": "const db = indexedDB.open('notes');" }] }
+  ],
+  "relations": []
+}

@@ -1,0 +1,7 @@
+{
+  "items": [
+    { "ref": "i1", "type": "constraint", "content": "The API must be versioned", "origin": "user", "assertion": "explicit", "confidence": 0.97, "strength": "must", "status": null, "language": null, "filename": null, "uri": null, "title": null, "evidence": [{ "message": "m0", "quote": "The API must be versioned." }] },
+    { "ref": "i2", "type": "preference", "content": "Prefers small pull requests", "origin": "user", "assertion": "explicit", "confidence": 0.95, "strength": null, "status": null, "language": null, "filename": null, "uri": null, "title": null, "evidence": [{ "message": "m2", "quote": "I prefer small pull requests." }] }
+  ],
+  "relations": []
+}

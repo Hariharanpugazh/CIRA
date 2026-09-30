@@ -35,6 +35,11 @@ function note(d: DecodedItem, opts: Required<RenderMarkdownOptions>): string {
   if (opts.confidence && d.provenance.method !== 'deterministic' && d.provenance.method !== 'manual') {
     s += ` ${d.item.confidence.toFixed(2)}`;
   }
+  // Semantic attribution (only present for semantic/hybrid documents).
+  const a = d.annotation;
+  if (a && (a.assertion === 'suggested' || a.assertion === 'inferred' || a.assertion === 'quoted')) {
+    s += ` · ${a.assertion}${a.assertion === 'suggested' && a.origin !== 'user' ? ` by ${a.origin}` : ''}`;
+  }
   return ` _(${s})_`;
 }
 
@@ -83,6 +88,9 @@ export function renderMarkdown(ctx: DecodedContext, options: RenderMarkdownOptio
     out.push(`> Extraction: ${ctx.methods.map((m) => METHOD_NOTE[m] ?? m).join('; ')}.`);
     if (ctx.methods.includes('heuristic')) {
       out.push('> Confidence values are rule-based estimates, not model judgements. Check important items against the source turn.');
+    }
+    if (ctx.methods.includes('model')) {
+      out.push('> Model-extracted items are backed by verbatim evidence from the selected messages. Items marked "suggested by assistant" are proposals, not user requirements.');
     }
     out.push('');
   }

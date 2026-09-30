@@ -1,0 +1,25 @@
+{
+  "id": "selection-boundary",
+  "description": "Only the selected messages (0 and 2) may contribute context.",
+  "conversation": {
+    "source": "chatgpt",
+    "title": "Selection",
+    "url": "https://chatgpt.com/c/eval-selection",
+    "capturedAt": "2026-09-30T09:00:00.000Z",
+    "messages": [
+      { "role": "user", "content": "The API must be versioned." },
+      { "role": "assistant", "content": "UNSELECTED: we decided to use GraphQL." },
+      { "role": "user", "content": "I prefer small pull requests." },
+      { "role": "user", "content": "UNSELECTED: the backend must use Rust." }
+    ]
+  },
+  "selection": [0, 2],
+  "expected": [
+    { "type": "constraint", "origin": "user", "message": 0, "match": ["versioned"] },
+    { "type": "preference", "origin": "user", "message": 2, "match": ["small pull requests"] }
+  ],
+  "forbidden": [
+    { "type": "decision", "origin": "assistant", "match": ["graphql"], "reason": "extracted from an unselected message" },
+    { "type": "constraint", "origin": "user", "match": ["rust"], "reason": "extracted from an unselected message" }
+  ]
+}

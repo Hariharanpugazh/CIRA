@@ -42,7 +42,8 @@ export type ItemDraft = DistributiveOmit<ContextItem, 'id' | 'provenance' | 'cre
   span?: Span;
 };
 
-export interface ExtractionInput {
+/** Input of a per-turn rule (`ItemExtractor`). */
+export interface TurnExtractionInput {
   conversation: PcoConversation;
   turn: Turn;
   /** Turn content with fenced code blocks blanked out (offsets preserved). */
@@ -50,12 +51,13 @@ export interface ExtractionInput {
 }
 
 /**
- * Pluggable extraction step. Phase 01 ships deterministic and heuristic
- * extractors only; a model-based extractor would declare `method: 'model'`.
+ * Pluggable per-turn rule used by the deterministic encoder (code blocks,
+ * links, heuristic statements). Conversation-level extractors (deterministic
+ * or semantic) implement `ContextExtractor` in `../semantic/types`.
  */
 export interface ItemExtractor {
   readonly id: string;
   readonly version: string;
   readonly method: ExtractionMethod;
-  extract(input: ExtractionInput): ItemDraft[];
+  extract(input: TurnExtractionInput): ItemDraft[];
 }
