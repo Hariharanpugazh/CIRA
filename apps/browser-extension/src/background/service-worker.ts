@@ -4,7 +4,9 @@ import type { RuntimeMessage } from '@/shared/messaging';
 import type { Conversation } from '@/shared/schema';
 import { buildRelaySummary } from '@/shared/relay';
 import { ChromeContextStore } from '@/storage/chrome-context-store';
+import { API_KEY_STORAGE_KEY, normalizeSettings } from '@/shared/extraction-settings';
 import { resyncStoredPco, saveConversationAsPco } from './context-pipeline';
+import { buildSemanticDraft, type BuildDraftResponse } from './extraction';
 import { syncToLocalHost } from './local-sync';
 
 const CLIENT_ID = `cira-browser-extension@${chrome.runtime.getManifest().version}`;
@@ -209,6 +211,33 @@ async function handleRateLimitDetected(source: string, timestamp: number): Promi
   await chrome.storage.local.set({ [key]: log.slice(-MAX_RATE_LIMIT_LOG) });
 }
 
+/**
+ * Semantic / hybrid draft. Settings come from storage.local; the optional API
+ * key from storage.session (not readable by content scripts). A local model
+ * can take longer than the 30 s idle window, so an extension API call every
+ * 20 s keeps the worker alive until the provider answers (or times out).
+ */
+async function handleBuildDraft(msg: Extract<RuntimeMessage, { type: 'CIRA/BUILD_DRAFT' }>): Promise<BuildDraftResponse> {
+  const { [STORAGE_KEYS.settings]: raw } = await chrome.storage.local.get(STORAGE_KEYS.settings);
+  const settings = normalizeSettings(raw);
+  const apiKey = (await chrome.storage.session.get(API_KEY_STORAGE_KEY).catch(() => ({})) as Record<string, unknown>)[API_KEY_STORAGE_KEY];
+  const keepAlive = setInterval(() => void chrome.runtime.getPlatformInfo().catch(() => {}), 20_000);
+  try {
+    return await buildSemanticDraft(
+      msg.conversation,
+      { messageIndexes: msg.messageIndexes, mode: msg.mode },
+      {
+        client: CLIENT_ID,
+        provider: settings.provider,
+        ...(typeof apiKey === 'string' && apiKey ? { apiKey } : {}),
+        hasPermission: (origin) => chrome.permissions.contains({ origins: [origin] }),
+      },
+    );
+  } finally {
+    clearInterval(keepAlive);
+  }
+}
+
 chrome.runtime.onMessage.addListener((msg: RuntimeMessage, _sender, sendResponse) => {
   switch (msg.type) {
 
@@ -255,7 +284,20 @@ chrome.runtime.onMessage.addListener((msg: RuntimeMessage, _sender, sendResponse
         msg.conversation,
         { store: contextStore, sync: syncToLocalHost, client: CLIENT_ID },
         msg.selection,
+        msg.draft,
       ).then(sendResponse);
+      return true;
+    }
+
+    case 'CIRA/BUILD_DRAFT': {
+      // Only extension pages (the side panel) may trigger a provider call; never a content script.
+      if (!_sender.url?.startsWith(chrome.runtime.getURL(''))) {
+        sendResponse({ ok: false, code: 'unknown', error: 'Semantic extraction can only be started from the CIRA side panel.' });
+        return false;
+      }
+      void handleBuildDraft(msg).then(sendResponse, (err) =>
+        sendResponse({ ok: false, code: 'unknown', error: err instanceof Error ? err.message : String(err) }),
+      );
       return true;
     }
 

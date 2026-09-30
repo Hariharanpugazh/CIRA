@@ -1,5 +1,6 @@
 import type { Conversation, RelayPayload } from '@/shared/schema';
 import type { ContextSelection } from '@/shared/context-selection';
+import type { PCODocument } from '@cira/core';
 
 export type RuntimeMessage =
   | { type: 'CIRA/EXTRACT_REQUEST' }
@@ -27,7 +28,11 @@ export type RuntimeMessage =
   | { type: 'CIRA/FETCH_IMAGE'; url: string }
   | { type: 'CIRA/EXPORT_CONVERSATION'; conversation: Conversation }
   // Phase 01 context pipeline (replies: SaveContextResponse / PCODocument | null / ContextSummary[])
-  | { type: 'CIRA/SAVE_CONTEXT'; conversation: Conversation; selection?: ContextSelection }
+  // `draft`: a reviewed semantic/hybrid draft. The service worker keeps the
+  // selected items of it instead of re-extracting (a model is not repeatable).
+  | { type: 'CIRA/SAVE_CONTEXT'; conversation: Conversation; selection?: ContextSelection; draft?: PCODocument }
+  // Phase 02C: semantic / hybrid draft for review (reply: BuildDraftResponse).
+  | { type: 'CIRA/BUILD_DRAFT'; conversation: Conversation; messageIndexes: number[]; mode: 'semantic' | 'hybrid' }
   | { type: 'CIRA/SYNC_CONTEXT'; id: string }
   | { type: 'CIRA/GET_CONTEXT'; id: string }
   | { type: 'CIRA/LIST_CONTEXTS' }

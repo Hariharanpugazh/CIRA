@@ -11,12 +11,40 @@ import {
   migrateLegacyConversation,
   scanDocument,
   validate,
+  validateSemanticExtension,
   type ContextStore,
   type ContextSummary,
   type PCODocument,
 } from '@cira/core';
 import type { Conversation } from '@/shared/schema';
-import { buildSelectedContext, type ContextSelection } from '@/shared/context-selection';
+import {
+  applyItemSelection,
+  buildSelectedContext,
+  normalizeMessageIndexes,
+  SelectionError,
+  selectionMetaOf,
+  type ContextSelection,
+} from '@/shared/context-selection';
+
+/**
+ * Semantic / hybrid save: keep the chosen items of the draft the user
+ * reviewed. Checks that the draft belongs to this conversation and selection
+ * (only selected turns inside, same message indexes) before trusting it.
+ */
+function finalizeReviewedDraft(conversation: Conversation, draft: PCODocument, selection?: ContextSelection): { document: PCODocument; warnings: string[] } {
+  if (!selection) throw new SelectionError('A reviewed draft needs its message selection.');
+  const indexes = normalizeMessageIndexes(selection.messageIndexes, conversation.messages.length);
+  const meta = selectionMetaOf(draft);
+  if (!meta || meta.message_indexes.join(',') !== indexes.join(',') || meta.total_messages !== conversation.messages.length) {
+    throw new SelectionError('The reviewed context does not match the selected messages. Review the selection again.');
+  }
+  const keep = new Set(indexes);
+  const turns = draft.conversations.flatMap((c) => c.turns);
+  if (draft.conversations.length !== 1 || turns.some((t) => !keep.has(t.index))) {
+    throw new SelectionError('The reviewed context contains messages that were not selected. Review the selection again.');
+  }
+  return { document: applyItemSelection(draft, selection.itemIds), warnings: [] };
+}
 
 export type SyncResult =
   | { status: 'synced'; path: string }
@@ -71,17 +99,26 @@ export async function saveConversationAsPco(
   conversation: Conversation,
   deps: PipelineDeps,
   selection?: ContextSelection,
+  reviewedDraft?: PCODocument,
 ): Promise<SaveContextResponse> {
   try {
     const now = (deps.now ?? (() => new Date()))();
-    const { document, warnings } = selection
-      ? buildSelectedContext(conversation, selection, { client: deps.client, now })
-      : migrateLegacyConversation(conversation, { client: deps.client, createdBy: deps.client, now });
+    const { document, warnings } = reviewedDraft
+      ? finalizeReviewedDraft(conversation, reviewedDraft, selection)
+      : selection
+        ? buildSelectedContext(conversation, selection, { client: deps.client, now })
+        : migrateLegacyConversation(conversation, { client: deps.client, createdBy: deps.client, now });
 
     const validation = validate(document);
     if (!validation.ok) {
       return { ok: false, error: `Encoded PCO failed validation: ${validation.errors.map((e) => e.message).join('; ')}` };
     }
+    const semanticIssues = validateSemanticExtension(document);
+    const blocking = semanticIssues.filter((i) => i.code === 'invalid_extension' || i.code === 'unknown_item' || i.code === 'unknown_turn');
+    if (blocking.length) {
+      return { ok: false, error: `Semantic metadata failed validation: ${blocking.map((i) => i.message).join('; ')}` };
+    }
+    warnings.push(...semanticIssues.filter((i) => !blocking.includes(i)).map((i) => `semantic: ${i.message}`));
 
     // Safety scan happens before anything is persisted, so the UI can warn.
     const safety = scanDocument(document);

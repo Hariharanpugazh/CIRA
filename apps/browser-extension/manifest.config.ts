@@ -63,6 +63,12 @@ export default defineManifest({
     'nativeMessaging',
   ],
   host_permissions: AI_MATCHES,
+  // Phase 02C: semantic extraction providers. Nothing is granted at install.
+  // The side panel requests exactly one origin (the configured endpoint) via
+  // chrome.permissions.request when the user first runs Semantic/Hybrid.
+  // Loopback covers Ollama / LM Studio; `https://*/*` only makes a
+  // user-chosen remote endpoint requestable (match patterns ignore ports).
+  optional_host_permissions: ['http://127.0.0.1/*', 'http://localhost/*', 'https://*/*'],
   icons: {
     '16': 'src/assets/icon-16.png',
     '32': 'src/assets/icon-32.png',

@@ -8,9 +8,11 @@
  * (Chrome wiring).
  */
 import { useMemo, type ReactNode } from 'react';
-import { scanDocument } from '@cira/core';
+import { getSemanticExtension, scanDocument } from '@cira/core';
 import { describeSync } from '@/shared/context-client';
-import { buildPcoHandoff, estimateTokens } from '@/shared/context-selection';
+import { applyItemSelection, buildPcoHandoff, estimateTokens } from '@/shared/context-selection';
+import { MODE_LABEL } from '@/shared/extraction-settings';
+import { ExtractionModeHint, ExtractionModeSelect, ProviderForm, type ExtractionModeControlProps } from './components/ExtractionModeControl';
 import { brandFor, relayTargets } from './brands';
 import { ActiveContextCard } from './components/ActiveContextCard';
 import { ContextReview } from './components/ContextReview';
@@ -28,8 +30,10 @@ import { useWorkspace } from './hooks/useWorkspace';
 import { selectedItemIds } from './state/workspace';
 
 export function SidePanel() {
-  const { state, dispatch, tab, readChat, reloadTab, continueToReview, submit, retrySync, clearActive, editActive } = useWorkspace();
+  const { state, dispatch, tab, hasApiKey, readChat, reloadTab, continueToReview, submit, retrySync, clearActive, editActive, setMode, setProvider, setApiKey } =
+    useWorkspace();
   const { step, conversation, busy } = state;
+  const semantic = useMemo(() => (state.draft ? getSemanticExtension(state.draft) : undefined), [state.draft]);
   const source = conversation?.source ?? tab.source;
   const keptIds = useMemo(() => selectedItemIds(state), [state.draft, state.removedItems]);
 
@@ -37,7 +41,10 @@ export function SidePanel() {
   const final = useMemo(() => {
     if (!state.draft) return null;
     const keep = new Set(keptIds);
-    const doc = { ...state.draft, items: state.draft.items.filter((i) => keep.has(i.id)) };
+    // Semantic drafts: exactly what will be saved/sent (annotations pruned with their items).
+    const doc = getSemanticExtension(state.draft)
+      ? applyItemSelection(state.draft, keptIds)
+      : { ...state.draft, items: state.draft.items.filter((i) => keep.has(i.id)) };
     const text = buildPcoHandoff(doc, { source: conversation?.source ?? 'unknown', title: conversation?.title });
     const scan = scanDocument(doc);
     return { doc, tokens: estimateTokens(text), warnings: scan.hasFindings ? scan.warnings : [] };
@@ -68,6 +75,40 @@ export function SidePanel() {
         <StatusBanner level="error" title={state.error} onDismiss={() => dispatch({ type: 'error/dismiss' })} />
       )}
 
+      {state.semanticError && (
+        <StatusBanner
+          level="error"
+          title="Semantic extraction unavailable."
+          onDismiss={() => dispatch({ type: 'error/dismiss' })}
+          action={
+            <span className="cp-banner-buttons">
+              <button type="button" className="cp-btn cp-btn--ghost cp-btn--sm" onClick={() => void continueToReview()} disabled={!!busy}>
+                <RefreshIcon size={13} /> Retry
+              </button>{' '}
+              <button type="button" className="cp-btn cp-btn--ghost cp-btn--sm" onClick={() => void continueToReview('deterministic')} disabled={!!busy}>
+                Switch to Deterministic
+              </button>
+            </span>
+          }
+        >
+          {state.semanticError.message} Your message selection is unchanged.
+        </StatusBanner>
+      )}
+
+      {step === 'review' && semantic?.fallback && (
+        <StatusBanner
+          level="warn"
+          title="Semantic extraction unavailable: showing deterministic results only."
+          action={
+            <button type="button" className="cp-btn cp-btn--ghost cp-btn--sm" onClick={() => void continueToReview()} disabled={!!busy}>
+              <RefreshIcon size={13} /> Retry semantic
+            </button>
+          }
+        >
+          {state.draftInfo?.fallbackReason ?? 'The semantic model could not be used.'}
+        </StatusBanner>
+      )}
+
       <main className="cp-main">
         {step === 'idle' &&
           (tab.source === 'unknown' ? (
@@ -84,6 +125,13 @@ export function SidePanel() {
 
         {step === 'review' && state.draft && (
           <ContextReview draft={state.draft} removed={state.removedItems} dispatch={dispatch}>
+            {semantic && !semantic.fallback && (
+              <p className="cp-hint cp-extracted-by">
+                {MODE_LABEL[semantic.mode]} extraction
+                {state.draftInfo?.provider ? ` · ${state.draftInfo.provider.model} on ${state.draftInfo.provider.host} (${state.draftInfo.provider.locality})` : ''}. Model
+                output can be wrong or incomplete: check each item before you continue.
+              </p>
+            )}
             {final && conversation && (
               <ContextSummary
                 messages={state.selectedMessages.size}
@@ -121,6 +169,21 @@ export function SidePanel() {
         saveLocally={state.saveLocally}
         onBack={() => dispatch({ type: 'back' })}
         onReview={() => void continueToReview()}
+        modeControl={
+          step === 'select'
+            ? {
+                mode: state.mode,
+                provider: state.provider,
+                providerOpen: state.providerOpen,
+                hasApiKey,
+                disabled: !!busy,
+                onMode: setMode,
+                onProvider: setProvider,
+                onProviderOpen: (open) => dispatch({ type: 'provider/open', open }),
+                onApiKey: (key) => void setApiKey(key),
+              }
+            : undefined
+        }
         onSend={() => dispatch({ type: 'send/open' })}
         onSubmit={() => void submit()}
         onNew={() => void readChat()}
@@ -171,9 +234,11 @@ interface FooterProps {
   onSend: () => void;
   onSubmit: () => void;
   onNew: () => void;
+  /** Select step only. */
+  modeControl?: ExtractionModeControlProps;
 }
 
-function Footer({ step, busy, selectedMessages, selectedItems, target, saveLocally, canRead, onBack, onReview, onSend, onSubmit, onNew }: FooterProps) {
+function Footer({ step, busy, selectedMessages, selectedItems, target, saveLocally, canRead, onBack, onReview, onSend, onSubmit, onNew, modeControl }: FooterProps) {
   if (step === 'idle') return null;
   const back = step === 'review' || step === 'send' ? (
     <button type="button" className="cp-btn cp-btn--ghost" onClick={onBack} disabled={busy}><ChevronLeftIcon size={14} /> Back</button>
@@ -203,9 +268,12 @@ function Footer({ step, busy, selectedMessages, selectedItems, target, saveLocal
 
   return (
     <footer className="cp-footer">
+      {modeControl && modeControl.mode !== 'deterministic' && modeControl.providerOpen && <ProviderForm {...modeControl} />}
+      {modeControl && <ExtractionModeHint mode={modeControl.mode} provider={modeControl.provider} />}
       {hint && <div className="cp-footer-hint">{hint}</div>}
       <div className="cp-footer-row">
         {back}
+        {modeControl && <ExtractionModeSelect {...modeControl} />}
         <span className="cp-spacer" />
         {primary}
       </div>

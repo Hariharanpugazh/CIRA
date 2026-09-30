@@ -1,5 +1,5 @@
 import { useCallback, useMemo, type ReactNode } from 'react';
-import type { PCODocument } from '@cira/core';
+import { getSemanticExtension, type PCODocument } from '@cira/core';
 import { itemMessageNumber } from '@/shared/context-selection';
 import type { WorkspaceAction } from '../state/workspace';
 import { ContextItemRow } from './ContextItemRow';
@@ -15,7 +15,10 @@ export interface ContextReviewProps {
 }
 
 export function ContextReview({ draft, removed, dispatch, children }: ContextReviewProps) {
-  const rows = useMemo(() => draft.items.map((item) => ({ item, messageNumber: itemMessageNumber(draft, item) })), [draft]);
+  const rows = useMemo(() => {
+    const annotations = getSemanticExtension(draft)?.items;
+    return draft.items.map((item) => ({ item, messageNumber: itemMessageNumber(draft, item), annotation: annotations?.[item.id] }));
+  }, [draft]);
   const onToggle = useCallback((id: string) => dispatch({ type: 'item/toggle', id }), [dispatch]);
   const selected = rows.filter((r) => !removed.has(r.item.id)).length;
 
@@ -41,8 +44,8 @@ export function ContextReview({ draft, removed, dispatch, children }: ContextRev
         />
       </div>
       <ul className="cp-list" aria-label="Extracted context items">
-        {rows.map(({ item, messageNumber }) => (
-          <ContextItemRow key={item.id} item={item} messageNumber={messageNumber} selected={!removed.has(item.id)} onToggle={onToggle} />
+        {rows.map(({ item, messageNumber, annotation }) => (
+          <ContextItemRow key={item.id} item={item} messageNumber={messageNumber} selected={!removed.has(item.id)} onToggle={onToggle} annotation={annotation} />
         ))}
       </ul>
       {children}

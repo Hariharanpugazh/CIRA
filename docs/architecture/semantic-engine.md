@@ -155,7 +155,7 @@ Semantic metadata lives in the extension namespace, so PCO v0.1 is unchanged:
 | `semantic` | semantic extractor only | the configured provider | error (no silent fallback) |
 | `hybrid` | rules + semantic → reconcile | the configured provider | deterministic items only, `fallback: true` |
 
-Configuring a provider never changes the mode. The browser extension, `cira migrate` and every existing flow stay deterministic.
+Configuring a provider never changes the mode. `cira migrate`, the popup capture and every existing flow stay deterministic. The side panel defaults to deterministic and only uses a model when the user picks Semantic or Hybrid (§11).
 
 ```powershell
 cira extract chat.json                                   # deterministic (same as migrate)
@@ -193,7 +193,32 @@ This is a foundation, not a benchmark. The fixtures are small and hand-written, 
 
 ## 10. Known limitations
 
-- The browser extension still uses deterministic mode. Semantic mode needs a settings surface and host permissions for provider endpoints; that is the next step.
+- Browser: Ollama rejects extension requests (HTTP 403) unless `OLLAMA_ORIGINS` includes `chrome-extension://*`. CIRA explains this in the error, but cannot change it.
+- Browser: an MV3 service worker task is capped at 5 minutes. The browser timeout is 120 s, so very slow local models fail there sooner than in the CLI.
 - On Node, the built-in `fetch` stops waiting for response headers after about 300 s, whatever `--timeout` says. Very slow local models can hit this.
 - `json_object` mode depends on the model following the schema from the prompt alone. Small models often fail, and those outputs are rejected.
 - Supersession is recorded, not resolved. Keyword-based evaluation cannot score relations yet.
+
+## 11. Browser integration (Phase 02C)
+
+The side panel flow is unchanged (Select → Review → Send). The Select step footer has a compact mode picker with a one-line description and privacy hint:
+
+| Mode | Hint |
+|---|---|
+| Deterministic (default) | "Nothing is sent to an AI provider." |
+| Semantic / Hybrid, loopback endpoint | "Processing locally with Ollama. Selected messages stay on this machine." |
+| Semantic / Hybrid, remote endpoint | "Selected messages will be sent to `<host>`. Unselected messages are never sent." |
+
+Flow for Semantic / Hybrid:
+
+1. The model is called only when the user presses **Continue to Review** (or **Retry**). Changing the mode, the selection or the conversation never calls it.
+2. The side panel asks for host access to exactly the provider origin (`chrome.permissions.request`, from `optional_host_permissions`). Nothing is sent if the user declines.
+3. `CIRA/BUILD_DRAFT` runs in the service worker (`background/extraction.ts` → `extractContext({ mode, selection })`). Only extension pages may send it. The API key is read there from `chrome.storage.session`, so pages and content scripts never see it.
+4. Remote endpoints are refused before any request when a selected message looks like it contains a secret, and must use `https://`.
+5. Review shows origin badges (`User`, `Assistant suggestion`, `Assistant`, `System`, `Tool`) and a `model` marker. Items can be removed as before.
+6. Save and Send reuse the reviewed draft. `CIRA/SAVE_CONTEXT { draft }` checks that it matches the selection, keeps the chosen items, prunes their annotations and relations, and validates it. A model is not deterministic, so nothing is re-extracted. Deterministic saves still rebuild with the Phase 01 encoder, byte-identical to before.
+7. The relay text comes from the final PCO. Semantic documents mark non-user items, e.g. `PROPOSED: … (assistant suggestion, not confirmed by the user)`. Deterministic relay text is unchanged.
+
+Failures show **Semantic extraction unavailable.** with **Retry** and **Switch to Deterministic**. The selection and conversation are kept. Hybrid falls back to rules only and says so in a banner, with **Retry semantic**.
+
+Settings live in `chrome.storage.local["cira.settings"]` as `{ extractionMode, provider: { preset, baseUrl, model } }`. CIRA never picks or downloads a model.

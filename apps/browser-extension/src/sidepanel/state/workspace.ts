@@ -11,7 +11,9 @@
  */
 import type { PCODocument } from '@cira/core';
 import type { SyncResult } from '@/background/context-pipeline';
+import type { DraftErrorCode, DraftProviderInfo } from '@/background/extraction';
 import type { ContextSelection } from '@/shared/context-selection';
+import { DEFAULT_PROVIDER, type ExtractionMode, type ExtractionSettings, type ProviderSettings } from '@/shared/extraction-settings';
 import type { Conversation, Role } from '@/shared/schema';
 
 export type Step = 'idle' | 'select' | 'review' | 'send' | 'success';
@@ -45,6 +47,26 @@ export interface ActiveContext {
   /** What was picked, so "Edit" can reopen the review. */
   conversation: Conversation;
   selection: ContextSelection;
+  /** Absent on contexts saved before Phase 02C (= deterministic). */
+  mode?: ExtractionMode;
+  /**
+   * Semantic / hybrid only: the full reviewed draft, so "Edit" reopens the
+   * same items instead of calling the model again.
+   */
+  draft?: PCODocument;
+}
+
+/** How the current draft was produced (semantic / hybrid only). */
+export interface DraftInfo {
+  mode: ExtractionMode;
+  fallback: boolean;
+  fallbackReason?: string;
+  provider?: DraftProviderInfo;
+}
+
+export interface SemanticFailure {
+  code: DraftErrorCode;
+  message: string;
 }
 
 export type BusyKind = 'reading' | 'extracting' | 'saving' | 'sending' | 'syncing';
@@ -81,6 +103,14 @@ export interface WorkspaceState {
   error: string | null;
   outcome: Outcome | null;
   active: ActiveContext | null;
+  /** Extraction mode for the next "Continue to Review". Default deterministic. */
+  mode: ExtractionMode;
+  provider: ProviderSettings;
+  /** Semantic provider config panel open (Semantic / Hybrid only). */
+  providerOpen: boolean;
+  draftInfo: DraftInfo | null;
+  /** Semantic / hybrid extraction failed; offers Retry and Switch to Deterministic. */
+  semanticError: SemanticFailure | null;
 }
 
 export const initialWorkspace: WorkspaceState = {
@@ -99,20 +129,30 @@ export const initialWorkspace: WorkspaceState = {
   error: null,
   outcome: null,
   active: null,
+  mode: 'deterministic',
+  provider: DEFAULT_PROVIDER,
+  providerOpen: false,
+  draftInfo: null,
+  semanticError: null,
 };
 
 export type WorkspaceAction =
   | { type: 'capture/start' }
   | { type: 'capture/ok'; conversation: Conversation }
   | { type: 'capture/fail'; error: string }
-  | { type: 'restore'; conversation: Conversation; selection: ContextSelection; removedItems: string[]; draft: PCODocument }
+  | { type: 'restore'; conversation: Conversation; selection: ContextSelection; removedItems: string[]; draft: PCODocument; mode?: ExtractionMode }
+  | { type: 'settings/loaded'; settings: ExtractionSettings }
+  | { type: 'mode/set'; mode: ExtractionMode }
+  | { type: 'provider/set'; provider: ProviderSettings }
+  | { type: 'provider/open'; open: boolean }
+  | { type: 'review/semantic-fail'; failure: SemanticFailure }
   | { type: 'message/toggle'; index: number; range?: boolean }
   | { type: 'messages/all' }
   | { type: 'messages/none' }
   | { type: 'messages/invert' }
   | { type: 'query'; query: string }
   | { type: 'review/start' }
-  | { type: 'review/ok'; draft: PCODocument; key: string }
+  | { type: 'review/ok'; draft: PCODocument; key: string; info?: DraftInfo | null }
   | { type: 'review/fail'; error: string }
   | { type: 'item/toggle'; id: string }
   | { type: 'items/all' }
@@ -162,6 +202,19 @@ export function selectionKey(selected: ReadonlySet<number>): string {
   return [...selected].sort((a, b) => a - b).join(',');
 }
 
+/**
+ * What a draft was built from: the mode, the provider (semantic / hybrid) and
+ * the message selection. A draft is reused only when all three match.
+ */
+export function draftKeyFor(selected: ReadonlySet<number>, mode: ExtractionMode, provider?: ProviderSettings): string {
+  const via = mode === 'deterministic' || !provider ? '' : `@${provider.baseUrl}|${provider.model}`;
+  return `${mode}${via}:${selectionKey(selected)}`;
+}
+
+export function busyLabelFor(mode: ExtractionMode): string {
+  return mode === 'deterministic' ? 'Extracting context…' : 'Extracting context… Using semantic model…';
+}
+
 export function selectedMessageIndexes(state: Pick<WorkspaceState, 'selectedMessages'>): number[] {
   return [...state.selectedMessages].sort((a, b) => a - b);
 }
@@ -205,10 +258,12 @@ export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction)
         query: '',
         draft: null,
         draftKey: null,
+        draftInfo: null,
         removedItems: new Set(),
         target: null,
         busy: null,
         error: null,
+        semanticError: null,
         outcome: null,
       };
     }
@@ -229,14 +284,37 @@ export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction)
         anchor: null,
         query: '',
         draft: action.draft,
-        draftKey: selectionKey(selected),
+        // Restored drafts are keyed by their own mode (not the provider), so they are
+        // reused as-is until the messages or the mode change.
+        mode: action.mode ?? 'deterministic',
+        draftKey: draftKeyFor(selected, action.mode ?? 'deterministic', action.mode && action.mode !== 'deterministic' ? state.provider : undefined),
+        draftInfo: action.mode && action.mode !== 'deterministic' ? { mode: action.mode, fallback: false } : null,
         removedItems: new Set(action.removedItems),
         target: null,
         busy: null,
         error: null,
+        semanticError: null,
         outcome: null,
       };
     }
+
+    case 'settings/loaded':
+      return { ...state, mode: action.settings.extractionMode, provider: action.settings.provider };
+    case 'mode/set':
+      return {
+        ...state,
+        mode: action.mode,
+        providerOpen: action.mode === 'deterministic' ? false : state.providerOpen,
+        semanticError: null,
+        error: null,
+      };
+    case 'provider/set':
+      return { ...state, provider: action.provider, semanticError: null };
+    case 'provider/open':
+      return { ...state, providerOpen: action.open };
+    case 'review/semantic-fail':
+      // Selection, conversation and any previous draft stay untouched.
+      return { ...state, busy: null, error: null, semanticError: action.failure };
 
     case 'message/toggle': {
       const value = !state.selectedMessages.has(action.index);
@@ -271,10 +349,19 @@ export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction)
 
     case 'review/start':
       if (state.selectedMessages.size === 0) return { ...state, error: EMPTY_MESSAGES };
-      return { ...state, busy: { kind: 'extracting', label: 'Extracting context…' }, error: null };
+      return { ...state, busy: { kind: 'extracting', label: busyLabelFor(state.mode) }, error: null, semanticError: null };
 
     case 'review/ok':
-      return { ...state, step: 'review', draft: action.draft, draftKey: action.key, busy: null, error: null };
+      return {
+        ...state,
+        step: 'review',
+        draft: action.draft,
+        draftKey: action.key,
+        draftInfo: action.info === undefined ? state.draftInfo : action.info,
+        busy: null,
+        error: null,
+        semanticError: null,
+      };
 
     case 'review/fail':
       return { ...state, busy: null, error: action.error };
@@ -303,7 +390,7 @@ export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction)
     case 'back': {
       const prev: Partial<Record<Step, Step>> = { review: 'select', send: 'review', success: 'send' };
       const to = prev[state.step];
-      return to ? { ...state, step: to, error: null, busy: null } : state;
+      return to ? { ...state, step: to, error: null, semanticError: null, busy: null } : state;
     }
 
     case 'target':
@@ -330,8 +417,9 @@ export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction)
     case 'active/set':
       return { ...state, active: action.active };
     case 'error/dismiss':
-      return { ...state, error: null };
+      return { ...state, error: null, semanticError: null };
     case 'reset':
-      return { ...initialWorkspace, active: state.active };
+      // Settings are the user's choice, not part of one context.
+      return { ...initialWorkspace, active: state.active, mode: state.mode, provider: state.provider };
   }
 }

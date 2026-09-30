@@ -1,14 +1,32 @@
 /** UI-side helpers for the PCO pipeline running in the service worker. */
+import type { PCODocument } from '@cira/core';
 import type { SaveContextResponse, SyncResult } from '@/background/context-pipeline';
+import type { BuildDraftResponse } from '@/background/extraction';
 import type { ContextSelection } from './context-selection';
 import type { RuntimeMessage } from './messaging';
 import type { Conversation } from './schema';
 
-export type { SaveContextResponse, SyncResult };
+export type { BuildDraftResponse, SaveContextResponse, SyncResult };
 
-export async function saveContext(conversation: Conversation, selection?: ContextSelection): Promise<SaveContextResponse> {
+/** Ask the service worker for a semantic / hybrid draft of the selected messages. */
+export async function buildDraft(conversation: Conversation, messageIndexes: number[], mode: 'semantic' | 'hybrid'): Promise<BuildDraftResponse> {
   try {
-    const res = (await chrome.runtime.sendMessage({ type: 'CIRA/SAVE_CONTEXT', conversation, ...(selection ? { selection } : {}) } satisfies RuntimeMessage)) as
+    const res = (await chrome.runtime.sendMessage({ type: 'CIRA/BUILD_DRAFT', conversation, messageIndexes, mode } satisfies RuntimeMessage)) as
+      | BuildDraftResponse
+      | undefined;
+    return res ?? { ok: false, code: 'unknown', error: 'No response from the CIRA service worker' };
+  } catch (err) {
+    return { ok: false, code: 'unknown', error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+/**
+ * `draft`: the reviewed semantic/hybrid draft to keep items from. Omit for
+ * deterministic contexts (the service worker rebuilds them, as in Phase 01).
+ */
+export async function saveContext(conversation: Conversation, selection?: ContextSelection, draft?: PCODocument): Promise<SaveContextResponse> {
+  try {
+    const res = (await chrome.runtime.sendMessage({ type: 'CIRA/SAVE_CONTEXT', conversation, ...(selection ? { selection } : {}), ...(draft ? { draft } : {}) } satisfies RuntimeMessage)) as
       | SaveContextResponse
       | undefined;
     return res ?? { ok: false, error: 'No response from the CIRA service worker' };

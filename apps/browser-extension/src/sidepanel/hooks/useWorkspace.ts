@@ -2,27 +2,43 @@
  * Wires the pure workspace reducer to Chrome: the active tab, capture,
  * extraction preview, save (service worker → ContextStore → native host),
  * relay staging and the persisted "active context".
+ *
+ * Extraction modes (Phase 02C):
+ *  - deterministic (default): built here, synchronously, exactly as in Phase 01.
+ *  - semantic / hybrid: built by the service worker (CIRA/BUILD_DRAFT) from the
+ *    selected messages only, and only when the user presses Continue. Saving
+ *    and sending reuse the reviewed draft; the model is never called again.
  */
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
-import { scanDocument } from '@cira/core';
+import { getSemanticExtension, scanDocument } from '@cira/core';
 import { detectSource } from '@/platform/detect';
 import { TARGET_URLS } from '@/platform/urls';
-import { retrySync as retrySyncRequest, saveContext } from '@/shared/context-client';
-import { buildPcoHandoff, buildSelectedContext, selectMessages } from '@/shared/context-selection';
-import type { RuntimeMessage } from '@/shared/messaging';
+import { buildDraft, retrySync as retrySyncRequest, saveContext } from '@/shared/context-client';
+import { applyItemSelection, buildPcoHandoff, buildSelectedContext, draftMode, selectMessages } from '@/shared/context-selection';
+import {
+  API_KEY_STORAGE_KEY,
+  normalizeSettings,
+  providerOriginPattern,
+  providerProblem,
+  type ExtractionMode,
+  type ExtractionSettings,
+  type ProviderSettings,
+} from '@/shared/extraction-settings';
+import { STORAGE_KEYS, type RuntimeMessage } from '@/shared/messaging';
 import { chromeTabApi, extractFromTab, NOT_CONNECTED_MESSAGE } from '@/shared/tab-connection';
 import { brandFor } from '../brands';
 import {
   currentSelection,
+  draftKeyFor,
   initialWorkspace,
   selectedMessageIndexes,
-  selectionKey,
   workspaceReducer,
   type ActiveContext,
   type WorkspaceState,
 } from '../state/workspace';
 
 export const ACTIVE_CONTEXT_KEY = 'cira.active.context';
+export const SETTINGS_KEY = STORAGE_KEYS.settings;
 
 export interface TabInfo {
   tabId: number | null;
@@ -43,9 +59,14 @@ function pinnedTabId(): number | null {
 
 const nextTick = () => new Promise<void>((r) => setTimeout(r, 0));
 
+/** chrome.storage.session is only available to trusted extension contexts; tolerate its absence. */
+const session = () => (chrome.storage as { session?: chrome.storage.StorageArea }).session;
+
 export function useWorkspace() {
   const [state, dispatch] = useReducer(workspaceReducer, initialWorkspace);
   const [tab, setTab] = useState<TabInfo>({ tabId: null, source: 'unknown' });
+  /** Only whether a key is stored; the side panel never keeps the key itself. */
+  const [hasApiKey, setHasApiKey] = useState(false);
   const stateRef = useRef<WorkspaceState>(state);
   stateRef.current = state;
 
@@ -67,17 +88,46 @@ export function useWorkspace() {
     };
   }, [refreshTab]);
 
-  // --- active context -----------------------------------------------------
+  // --- active context + settings -----------------------------------------
   useEffect(() => {
     void chrome.storage.local.get(ACTIVE_CONTEXT_KEY).then((r) => {
       const active = r?.[ACTIVE_CONTEXT_KEY] as ActiveContext | undefined;
       if (active?.id) dispatch({ type: 'active/set', active });
     }).catch(() => {});
+    void chrome.storage.local.get(SETTINGS_KEY).then((r) => {
+      if (r?.[SETTINGS_KEY]) dispatch({ type: 'settings/loaded', settings: normalizeSettings(r[SETTINGS_KEY]) });
+    }).catch(() => {});
+    void Promise.resolve(session()?.get(API_KEY_STORAGE_KEY))
+      .then((r) => setHasApiKey(typeof r?.[API_KEY_STORAGE_KEY] === 'string' && !!r[API_KEY_STORAGE_KEY]))
+      .catch(() => {});
   }, []);
 
   const persistActive = useCallback(async (active: ActiveContext | null) => {
     if (active) await chrome.storage.local.set({ [ACTIVE_CONTEXT_KEY]: active });
     else await chrome.storage.local.remove(ACTIVE_CONTEXT_KEY);
+  }, []);
+
+  const persistSettings = useCallback(async (settings: ExtractionSettings) => {
+    await chrome.storage.local.set({ [SETTINGS_KEY]: settings }).catch(() => {});
+  }, []);
+
+  const setMode = useCallback((mode: ExtractionMode) => {
+    dispatch({ type: 'mode/set', mode });
+    void persistSettings({ extractionMode: mode, provider: stateRef.current.provider });
+  }, [persistSettings]);
+
+  const setProvider = useCallback((provider: ProviderSettings) => {
+    dispatch({ type: 'provider/set', provider });
+    void persistSettings({ extractionMode: stateRef.current.mode, provider });
+  }, [persistSettings]);
+
+  /** Store (or clear, with an empty string) the optional API key in session storage. */
+  const setApiKey = useCallback(async (key: string) => {
+    const area = session();
+    if (!area) return;
+    if (key.trim()) await area.set({ [API_KEY_STORAGE_KEY]: key.trim() });
+    else await area.remove(API_KEY_STORAGE_KEY);
+    setHasApiKey(!!key.trim());
   }, []);
 
   // --- flow ---------------------------------------------------------------
@@ -93,23 +143,69 @@ export function useWorkspace() {
     if (tab.tabId !== null) await chrome.tabs.reload(tab.tabId);
   }, [tab.tabId]);
 
-  const continueToReview = useCallback(async () => {
+  /**
+   * The ONLY place a semantic provider is called, and only on an explicit
+   * click (Continue to Review / Retry / Switch to Deterministic).
+   */
+  const continueToReview = useCallback(async (modeOverride?: ExtractionMode) => {
     const s = stateRef.current;
+    const mode = modeOverride ?? s.mode;
+    if (modeOverride && modeOverride !== s.mode) {
+      dispatch({ type: 'mode/set', mode: modeOverride });
+      void persistSettings({ extractionMode: modeOverride, provider: s.provider });
+    }
     dispatch({ type: 'review/start' });
     if (!s.conversation || s.selectedMessages.size === 0) return;
-    const key = selectionKey(s.selectedMessages);
-    if (s.draft && s.draftKey === key) {
+    const key = draftKeyFor(s.selectedMessages, mode, s.provider);
+    // A hybrid draft that fell back is not reused: Retry must try the model again.
+    if (s.draft && s.draftKey === key && !getSemanticExtension(s.draft)?.fallback) {
       dispatch({ type: 'review/ok', draft: s.draft, key });
       return;
     }
-    await nextTick(); // let "Extracting context…" render
-    try {
-      const { draft } = buildSelectedContext(s.conversation, { messageIndexes: selectedMessageIndexes(s) }, { client: clientId() });
-      dispatch({ type: 'review/ok', draft, key });
-    } catch (err) {
-      dispatch({ type: 'review/fail', error: err instanceof Error ? err.message : String(err) });
+
+    if (mode === 'deterministic') {
+      await nextTick(); // let "Extracting context…" render
+      try {
+        const { draft } = buildSelectedContext(s.conversation, { messageIndexes: selectedMessageIndexes(s) }, { client: clientId() });
+        dispatch({ type: 'review/ok', draft, key, info: null });
+      } catch (err) {
+        dispatch({ type: 'review/fail', error: err instanceof Error ? err.message : String(err) });
+      }
+      return;
     }
-  }, []);
+
+    const problem = providerProblem(s.provider);
+    if (problem) {
+      dispatch({ type: 'provider/open', open: true });
+      dispatch({ type: 'review/semantic-fail', failure: { code: 'not_configured', message: problem } });
+      return;
+    }
+    // Ask for access to exactly the provider's origin. This must be the first
+    // await so it still counts as part of the user's click.
+    const origin = providerOriginPattern(s.provider.baseUrl);
+    if (origin && chrome.permissions?.request) {
+      const granted = await chrome.permissions.request({ origins: [origin] }).catch(() => false);
+      if (!granted) {
+        dispatch({
+          type: 'review/semantic-fail',
+          failure: { code: 'permission', message: `Access to ${new URL(s.provider.baseUrl).host} was not granted, so nothing was sent.` },
+        });
+        return;
+      }
+    }
+
+    const r = await buildDraft(s.conversation, selectedMessageIndexes(s), mode);
+    if (r.ok) {
+      dispatch({
+        type: 'review/ok',
+        draft: r.draft,
+        key,
+        info: { mode: r.mode, fallback: r.fallback, ...(r.fallbackReason ? { fallbackReason: r.fallbackReason } : {}), provider: r.provider },
+      });
+    } else {
+      dispatch({ type: 'review/semantic-fail', failure: { code: r.code, message: r.error } });
+    }
+  }, [persistSettings]);
 
   const submit = useCallback(async () => {
     const s = stateRef.current;
@@ -121,19 +217,23 @@ export function useWorkspace() {
     if (!s.saveLocally && !target) return;
 
     const selection = currentSelection(s);
+    // Semantic / hybrid: the reviewed draft is final. Deterministic: rebuilt (Phase 01 behaviour).
+    const reviewed = s.draft && draftMode(s.draft) !== 'deterministic' ? s.draft : undefined;
     let saved = false;
     try {
       let document;
       let sync;
       let safetyWarnings: string[] = [];
       if (s.saveLocally) {
-        const r = await saveContext(conversation, selection);
+        const r = await saveContext(conversation, selection, reviewed);
         if (!r.ok) throw new Error(r.error);
         ({ document, sync } = r);
         saved = true;
         if (r.safety.hasFindings) safetyWarnings = r.safety.warnings;
       } else {
-        document = buildSelectedContext(conversation, selection, { client: clientId() }).document;
+        document = reviewed
+          ? applyItemSelection(reviewed, selection.itemIds)
+          : buildSelectedContext(conversation, selection, { client: clientId() }).document;
         const scan = scanDocument(document);
         if (scan.hasFindings) safetyWarnings = scan.warnings;
       }
@@ -147,6 +247,7 @@ export function useWorkspace() {
         await chrome.tabs.create({ url: TARGET_URLS[target] ?? `https://${target}.com/` });
       }
 
+      const mode = draftMode(document);
       const active: ActiveContext = {
         id: document.id,
         title: conversation.title,
@@ -161,6 +262,7 @@ export function useWorkspace() {
         document,
         conversation,
         selection,
+        ...(mode !== 'deterministic' ? { mode, draft: reviewed } : {}),
       };
       await persistActive(active).catch(() => {});
       dispatch({
@@ -194,14 +296,30 @@ export function useWorkspace() {
     const a = stateRef.current.active;
     if (!a) return;
     try {
-      const { draft } = buildSelectedContext(a.conversation, { messageIndexes: a.selection.messageIndexes }, { client: clientId() });
+      // Semantic / hybrid contexts reopen the stored draft; the model is not called again.
+      const draft = a.draft ?? buildSelectedContext(a.conversation, { messageIndexes: a.selection.messageIndexes }, { client: clientId() }).draft;
       const kept = new Set(a.selection.itemIds ?? draft.items.map((i) => i.id));
       const removedItems = draft.items.filter((i) => !kept.has(i.id)).map((i) => i.id);
-      dispatch({ type: 'restore', conversation: a.conversation, selection: a.selection, removedItems, draft });
+      dispatch({ type: 'restore', conversation: a.conversation, selection: a.selection, removedItems, draft, mode: a.draft ? a.mode : 'deterministic' });
     } catch (err) {
       dispatch({ type: 'capture/fail', error: err instanceof Error ? err.message : String(err) });
     }
   }, []);
 
-  return { state, dispatch, tab, readChat, reloadTab, continueToReview, submit, retrySync, clearActive, editActive };
+  return {
+    state,
+    dispatch,
+    tab,
+    hasApiKey,
+    readChat,
+    reloadTab,
+    continueToReview,
+    submit,
+    retrySync,
+    clearActive,
+    editActive,
+    setMode,
+    setProvider,
+    setApiKey,
+  };
 }
