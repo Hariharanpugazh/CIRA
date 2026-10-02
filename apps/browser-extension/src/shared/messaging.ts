@@ -33,6 +33,8 @@ export type RuntimeMessage =
   | { type: 'CIRA/SAVE_CONTEXT'; conversation: Conversation; selection?: ContextSelection; draft?: PCODocument }
   // Phase 02C: semantic / hybrid draft for review (reply: BuildDraftResponse).
   | { type: 'CIRA/BUILD_DRAFT'; conversation: Conversation; messageIndexes: number[]; mode: 'semantic' | 'hybrid' }
+  // List the models the configured provider + key can access (reply: ListModelsResponse).
+  | { type: 'CIRA/LIST_MODELS' }
   | { type: 'CIRA/SYNC_CONTEXT'; id: string }
   | { type: 'CIRA/GET_CONTEXT'; id: string }
   | { type: 'CIRA/LIST_CONTEXTS' }

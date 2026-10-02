@@ -13,7 +13,8 @@ import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import { getSemanticExtension, scanDocument } from '@cira/core';
 import { detectSource } from '@/platform/detect';
 import { TARGET_URLS } from '@/platform/urls';
-import { buildDraft, retrySync as retrySyncRequest, saveContext } from '@/shared/context-client';
+import { buildDraft, listProviderModels as listProviderModelsRequest, retrySync as retrySyncRequest, saveContext } from '@/shared/context-client';
+import type { ListModelsResponse } from '@/shared/context-client';
 import { applyItemSelection, buildPcoHandoff, buildSelectedContext, draftMode, selectMessages } from '@/shared/context-selection';
 import {
   API_KEY_STORAGE_KEY,
@@ -128,6 +129,23 @@ export function useWorkspace() {
     if (key.trim()) await area.set({ [API_KEY_STORAGE_KEY]: key.trim() });
     else await area.remove(API_KEY_STORAGE_KEY);
     setHasApiKey(!!key.trim());
+  }, []);
+
+  /**
+   * Ask the configured provider which models the key can access, so the model
+   * picker shows a live, accurate list. Requests the provider-origin
+   * permission first (as part of this click) so a remote fetch is allowed.
+   */
+  const fetchModels = useCallback(async (): Promise<ListModelsResponse> => {
+    const provider = stateRef.current.provider;
+    const origin = providerOriginPattern(provider.baseUrl);
+    if (origin && chrome.permissions?.request) {
+      const granted = await chrome.permissions.request({ origins: [origin] }).catch(() => false);
+      if (!granted) {
+        return { ok: false, code: 'permission', error: `Access to ${new URL(provider.baseUrl).host} was not granted, so no models were listed.` };
+      }
+    }
+    return listProviderModelsRequest();
   }, []);
 
   // --- flow ---------------------------------------------------------------
@@ -321,5 +339,6 @@ export function useWorkspace() {
     setMode,
     setProvider,
     setApiKey,
+    fetchModels,
   };
 }

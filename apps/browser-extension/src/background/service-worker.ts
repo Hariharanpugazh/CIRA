@@ -6,7 +6,7 @@ import { buildRelaySummary } from '@/shared/relay';
 import { ChromeContextStore } from '@/storage/chrome-context-store';
 import { API_KEY_STORAGE_KEY, normalizeSettings } from '@/shared/extraction-settings';
 import { resyncStoredPco, saveConversationAsPco } from './context-pipeline';
-import { buildSemanticDraft, type BuildDraftResponse } from './extraction';
+import { buildSemanticDraft, listProviderModels, type BuildDraftResponse, type ListModelsResponse } from './extraction';
 import { syncToLocalHost } from './local-sync';
 
 const CLIENT_ID = `cira-browser-extension@${chrome.runtime.getManifest().version}`;
@@ -238,6 +238,18 @@ async function handleBuildDraft(msg: Extract<RuntimeMessage, { type: 'CIRA/BUILD
   }
 }
 
+/** List the models the configured provider + stored key can access. */
+async function handleListModels(): Promise<ListModelsResponse> {
+  const { [STORAGE_KEYS.settings]: raw } = await chrome.storage.local.get(STORAGE_KEYS.settings);
+  const settings = normalizeSettings(raw);
+  const apiKey = (await chrome.storage.session.get(API_KEY_STORAGE_KEY).catch(() => ({})) as Record<string, unknown>)[API_KEY_STORAGE_KEY];
+  return listProviderModels({
+    provider: settings.provider,
+    ...(typeof apiKey === 'string' && apiKey ? { apiKey } : {}),
+    hasPermission: (origin) => chrome.permissions.contains({ origins: [origin] }),
+  });
+}
+
 chrome.runtime.onMessage.addListener((msg: RuntimeMessage, _sender, sendResponse) => {
   switch (msg.type) {
 
@@ -296,6 +308,18 @@ chrome.runtime.onMessage.addListener((msg: RuntimeMessage, _sender, sendResponse
         return false;
       }
       void handleBuildDraft(msg).then(sendResponse, (err) =>
+        sendResponse({ ok: false, code: 'unknown', error: err instanceof Error ? err.message : String(err) }),
+      );
+      return true;
+    }
+
+    case 'CIRA/LIST_MODELS': {
+      // Only extension pages (the side panel) may trigger a provider call; never a content script.
+      if (!_sender.url?.startsWith(chrome.runtime.getURL(''))) {
+        sendResponse({ ok: false, code: 'unknown', error: 'Listing models can only be started from the CIRA side panel.' });
+        return false;
+      }
+      void handleListModels().then(sendResponse, (err) =>
         sendResponse({ ok: false, code: 'unknown', error: err instanceof Error ? err.message : String(err) }),
       );
       return true;

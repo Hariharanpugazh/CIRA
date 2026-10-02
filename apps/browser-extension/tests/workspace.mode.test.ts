@@ -59,8 +59,8 @@ describe('extraction mode state', () => {
   it('privacy hint and provider checks', () => {
     const local = { preset: 'ollama' as const, baseUrl: OLLAMA_BASE_URL, model: 'm' };
     expect(privacyHint('deterministic', local)).toBe('Nothing is sent to an AI provider.');
-    expect(privacyHint('semantic', local)).toMatch(/^Processing locally with Ollama/);
-    expect(privacyHint('hybrid', { preset: 'openai-compatible', baseUrl: 'https://api.example.com/v1', model: 'm' })).toMatch(
+    expect(privacyHint('semantic', local)).toMatch(/^Processing locally at/);
+    expect(privacyHint('hybrid', { preset: 'custom', baseUrl: 'https://api.example.com/v1', model: 'm' })).toMatch(
       /^Selected messages will be sent to api\.example\.com/,
     );
     expect(providerProblem(local)).toBeNull();

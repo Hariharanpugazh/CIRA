@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   createOpenAICompatibleProvider,
   createScriptedProvider,
@@ -6,6 +6,7 @@ import {
   endpointHost,
   ExtractionError,
   isLoopbackUrl,
+  listModels,
   ProviderError,
   type HttpRequest,
   type HttpTransport,
@@ -101,6 +102,50 @@ describe('OpenAI-compatible provider', () => {
   it('validates configuration', () => {
     expect(() => createOpenAICompatibleProvider({ baseUrl: 'ftp://x', model: 'm' })).toThrow(ProviderError);
     expect(() => createOpenAICompatibleProvider({ baseUrl: 'http://localhost/v1', model: ' ' })).toThrow(/model is required/);
+  });
+});
+
+describe('listModels', () => {
+  function stubFetch(status: number, body: string) {
+    const calls: Array<{ url: string; init: { method: string; headers: Record<string, string> } }> = [];
+    const fn = vi.fn(async (url: string, init: { method: string; headers: Record<string, string> }) => {
+      calls.push({ url, init });
+      return { status, async text() { return body; } };
+    });
+    vi.stubGlobal('fetch', fn);
+    return { calls };
+  }
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('parses the OpenAI { data: [{ id }] } shape, sorted and deduped', async () => {
+    const { calls } = stubFetch(200, JSON.stringify({ data: [{ id: 'gpt-4o' }, { id: 'gpt-3.5-turbo' }, { id: 'gpt-4o' }] }));
+    const models = await listModels({ baseUrl: 'https://api.openai.com/v1/', apiKey: 'sk-KEY' });
+    expect(models).toEqual(['gpt-3.5-turbo', 'gpt-4o']);
+    expect(calls[0].url).toBe('https://api.openai.com/v1/models');
+    expect(calls[0].init.method).toBe('GET');
+    expect(calls[0].init.headers.authorization).toBe('Bearer sk-KEY');
+  });
+
+  it('parses Ollama { models: [{ name }] } and bare string arrays', async () => {
+    stubFetch(200, JSON.stringify({ models: [{ name: 'qwen2.5:7b' }, { name: 'llama3.3:70b' }] }));
+    expect(await listModels({ baseUrl: 'http://127.0.0.1:11434/v1' })).toEqual(['llama3.3:70b', 'qwen2.5:7b']);
+    stubFetch(200, JSON.stringify(['b-model', 'a-model']));
+    expect(await listModels({ baseUrl: 'http://127.0.0.1:1234/v1' })).toEqual(['a-model', 'b-model']);
+  });
+
+  it('maps HTTP and empty results to ProviderError', async () => {
+    stubFetch(401, JSON.stringify({ error: { message: 'bad key' } }));
+    const e401 = await listModels({ baseUrl: 'https://api.openai.com/v1', apiKey: 'x' }).catch((e) => e);
+    expect(e401).toBeInstanceOf(ProviderError);
+    expect(e401.status).toBe(401);
+    stubFetch(200, JSON.stringify({ data: [] }));
+    await expect(listModels({ baseUrl: 'https://api.openai.com/v1' })).rejects.toThrow(/no models/);
+  });
+
+  it('does not send an Authorization header when no key is given', async () => {
+    const { calls } = stubFetch(200, JSON.stringify({ data: [{ id: 'm' }] }));
+    await listModels({ baseUrl: 'http://127.0.0.1:11434/v1' });
+    expect(calls[0].init.headers.authorization).toBeUndefined();
   });
 });
 

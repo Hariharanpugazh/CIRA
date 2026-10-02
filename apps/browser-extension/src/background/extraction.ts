@@ -20,6 +20,7 @@ import {
   ExtractionError,
   fromLegacyConversation,
   isLoopbackUrl,
+  listModels,
   ProviderError,
   scanForSecrets,
   TurnSelectionError,
@@ -30,6 +31,7 @@ import {
 import { normalizeMessageIndexes, SelectionError, withSelectionMeta } from '@/shared/context-selection';
 import {
   BROWSER_SEMANTIC_TIMEOUT_MS,
+  isValidBaseUrl,
   providerHost,
   providerOriginPattern,
   providerProblem,
@@ -206,5 +208,68 @@ export async function buildSemanticDraft(conversation: Conversation, request: Bu
     if (err instanceof ProviderError) return fail(err.code === 'config' ? 'not_configured' : 'unknown', err.message);
     if (err instanceof TurnSelectionError || err instanceof SelectionError) return fail('selection', err.message);
     return fail('unknown', err instanceof Error ? err.message : String(err));
+  }
+}
+
+// ── Model discovery ─────────────────────────────────────────────────────────
+
+export interface ListModelsSuccess {
+  ok: true;
+  models: string[];
+  host: string;
+}
+
+export interface ListModelsFailure {
+  ok: false;
+  code: DraftErrorCode;
+  error: string;
+}
+
+export type ListModelsResponse = ListModelsSuccess | ListModelsFailure;
+
+export interface ListModelsDeps {
+  provider: ProviderSettings;
+  apiKey?: string;
+  /** chrome.permissions.contains for the provider origin. */
+  hasPermission?: (originPattern: string) => Promise<boolean>;
+  timeoutMs?: number;
+}
+
+/**
+ * Ask the configured provider which models the key can access, so the UI can
+ * offer a live, accurate list instead of hardcoded (and sometimes retired)
+ * suggestions. No conversation text is sent — only the key in the header.
+ */
+export async function listProviderModels(deps: ListModelsDeps): Promise<ListModelsResponse> {
+  const p = deps.provider;
+  if (!isValidBaseUrl(p.baseUrl)) return { ok: false, code: 'not_configured', error: 'Enter a valid http(s) endpoint URL first.' };
+  const host = providerHost(p);
+  const local = isLoopbackUrl(p.baseUrl);
+
+  const pattern = providerOriginPattern(p.baseUrl);
+  if (deps.hasPermission && pattern && !(await deps.hasPermission(pattern).catch(() => false))) {
+    return { ok: false, code: 'permission', error: `CIRA needs your permission to reach ${host} to list its models.` };
+  }
+
+  try {
+    const models = await listModels({
+      baseUrl: p.baseUrl,
+      ...(deps.apiKey ? { apiKey: deps.apiKey } : {}),
+      ...(deps.timeoutMs ? { timeoutMs: deps.timeoutMs } : {}),
+    });
+    return { ok: true, models, host };
+  } catch (err) {
+    if (err instanceof ProviderError) {
+      if (err.code === 'timeout') return { ok: false, code: 'timeout', error: `${host} did not answer in time.` };
+      if (err.code === 'network') return { ok: false, code: 'unreachable', error: local ? `Could not reach ${host}. Is your local model server running?` : `Could not reach ${host}.` };
+      if (err.code === 'http') {
+        if (err.status === 401) return { ok: false, code: 'unauthorized', error: `${host} rejected the key (HTTP 401). Check the API key.` };
+        if (err.status === 403) return { ok: false, code: 'forbidden', error: `${host} refused the request (HTTP 403).` };
+        if (err.status === 404) return { ok: false, code: 'http', error: `${host} has no model-list endpoint (HTTP 404). Enter the model name manually.` };
+        return { ok: false, code: 'http', error: err.message };
+      }
+      return { ok: false, code: 'unknown', error: err.message };
+    }
+    return { ok: false, code: 'unknown', error: err instanceof Error ? err.message : String(err) };
   }
 }

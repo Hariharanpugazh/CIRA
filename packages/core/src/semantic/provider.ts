@@ -194,6 +194,90 @@ export function createOpenAICompatibleProvider(config: OpenAICompatibleConfig): 
   };
 }
 
+// ── Model listing ─────────────────────────────────────────────────────────
+
+export interface ListModelsConfig {
+  /** Same base URL used for chat, e.g. "https://api.openai.com/v1". */
+  baseUrl: string;
+  /** Sent as `Authorization: Bearer …`. Never stored in PCO, logs or errors. */
+  apiKey?: string;
+  transport?: HttpTransport;
+  timeoutMs?: number;
+}
+
+/**
+ * List the models a key can access via the OpenAI-compatible `GET /models`
+ * endpoint. Returns model ids sorted alphabetically. Works for OpenAI, Groq,
+ * OpenRouter, xAI, Gemini's OpenAI layer, Ollama, LM Studio and most others.
+ *
+ * Note: the transport abstraction only models POST for chat; model listing is
+ * a GET, so this uses `fetch` directly (through an injectable override for
+ * tests). It sends no conversation text — only the key in the header.
+ */
+export async function listModels(config: ListModelsConfig): Promise<string[]> {
+  if (!/^https?:\/\//i.test(config.baseUrl)) throw new ProviderError('config', 'baseUrl must be an http(s) URL');
+  const url = `${config.baseUrl.replace(/\/+$/, '')}/models`;
+  const timeoutMs = config.timeoutMs ?? 15_000;
+  const headers: Record<string, string> = { accept: 'application/json' };
+  if (config.apiKey) headers.authorization = `Bearer ${config.apiKey}`;
+
+  const g = globalThis as {
+    fetch?: (u: string, init: { method: string; headers: Record<string, string>; signal?: unknown }) => Promise<{ status: number; text(): Promise<string> }>;
+    AbortSignal?: { timeout?(ms: number): unknown };
+  };
+  if (!g.fetch) throw new ProviderError('config', 'no fetch implementation available');
+  const signal = g.AbortSignal?.timeout?.(timeoutMs);
+
+  let status: number;
+  let text: string;
+  try {
+    const res = await g.fetch(url, { method: 'GET', headers, ...(signal ? { signal } : {}) });
+    status = res.status;
+    text = await res.text();
+  } catch (err) {
+    const name = (err as { name?: string })?.name;
+    if (name === 'TimeoutError' || name === 'AbortError') throw new ProviderError('timeout', `listing models timed out after ${timeoutMs} ms`);
+    throw new ProviderError('network', 'could not reach the provider to list models');
+  }
+  if (status < 200 || status >= 300) {
+    const detail = safeProviderMessage(text, '');
+    throw new ProviderError('http', `listing models returned HTTP ${status}${detail ? `: ${detail}` : ''}`, status);
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    throw new ProviderError('bad_response', 'the provider returned a non-JSON model list');
+  }
+  const ids = extractModelIds(parsed);
+  if (!ids.length) throw new ProviderError('bad_response', 'the provider returned no models');
+  return ids;
+}
+
+/**
+ * Pull model ids out of the common shapes: OpenAI `{ data: [{ id }] }`,
+ * Ollama's native `{ models: [{ name }] }`, or a bare array of strings/objects.
+ */
+function extractModelIds(parsed: unknown): string[] {
+  const rows: unknown[] = Array.isArray(parsed)
+    ? parsed
+    : Array.isArray((parsed as { data?: unknown })?.data)
+      ? ((parsed as { data: unknown[] }).data)
+      : Array.isArray((parsed as { models?: unknown })?.models)
+        ? ((parsed as { models: unknown[] }).models)
+        : [];
+  const ids = rows
+    .map((row) => {
+      if (typeof row === 'string') return row;
+      const r = row as { id?: unknown; name?: unknown; model?: unknown };
+      const id = r.id ?? r.name ?? r.model;
+      return typeof id === 'string' ? id : '';
+    })
+    .filter((id): id is string => !!id);
+  return [...new Set(ids)].sort((a, b) => a.localeCompare(b));
+}
+
 // ── Scripted provider (tests, demos, offline replay) ──────────────────────
 
 /**

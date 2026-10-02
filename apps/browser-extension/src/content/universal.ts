@@ -1,8 +1,6 @@
-import { createRelayPill } from '@/content/relay-pill';
 import { extractConversation } from '@/adapters/extract';
 import { injectPrompt } from '@/adapters/inject';
 import { detectSource } from '@/platform/detect';
-import { onDomChange } from '@/shared/dom';
 import type { RuntimeMessage } from '@/shared/messaging';
 import type { Source } from '@/shared/schema';
 import { createRateLimitDetector } from '@/platform/rate-limit-detection';
@@ -12,7 +10,6 @@ import type { AIPlatform } from '@/platform/rate-limit-detection';
 const source: Source = detectSource(location.href);
 
 let cleanupRateLimit: (() => void) | null = null;
-let pillMounted = false;
 
 // 1. Messaging FIRST. Optional features below must never be able to stop the
 //    extension from reaching this tab (Phase 01 bug: an exception during
@@ -52,16 +49,6 @@ chrome.runtime.onMessage.addListener((msg: RuntimeMessage, _sender, sendResponse
 });
 
 // 2. Optional features, each isolated.
-function mountPill(): void {
-  if (pillMounted) return;
-  try {
-    createRelayPill();
-    pillMounted = true;
-  } catch (err) {
-    console.error('[CIRA][content] relay pill failed to mount', err);
-  }
-}
-
 function startRateLimitMonitoring(): void {
   if (cleanupRateLimit || source === 'unknown') return;
   try {
@@ -81,10 +68,6 @@ function startRateLimitMonitoring(): void {
   }
 }
 
-mountPill();
-onDomChange(() => {
-  mountPill();
-}, 500);
 startRateLimitMonitoring();
 
 // Hidden unless DevTools "Verbose" level is enabled.

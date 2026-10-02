@@ -3,11 +3,10 @@
  * Regression: "Reload this tab to activate CIRA." on chatgpt.com.
  *
  * Root cause: Chrome content scripts run in an isolated world where
- * `window.customElements` is null. The relay pill called
- * `customElements.define()` at import time, which threw and aborted the whole
- * content script before its message listener was registered, so every PING /
- * EXTRACT_REQUEST from the side panel failed with "Receiving end does not
- * exist".
+ * `window.customElements` is null. Any import-time code that touched the
+ * custom-element registry threw and aborted the whole content script before
+ * its message listener was registered, so every PING / EXTRACT_REQUEST from
+ * the side panel failed with "Receiving end does not exist".
  *
  * This test loads the real content-script entry under the same conditions
  * (customElements === null, chatgpt.com URL, mocked chrome.*) and checks
@@ -74,10 +73,8 @@ describe('content script activation on chatgpt.com', () => {
     expect(await send({ type: 'CIRA/PING' })).toEqual({ type: 'CIRA/PONG', source: 'chatgpt' });
   });
 
-  it('mounts the relay pill without the custom-element registry', () => {
-    const host = document.querySelector('cira-relay-pill');
-    expect(host).not.toBeNull();
-    expect(host!.shadowRoot?.querySelector('.pill-wrap')).not.toBeNull();
+  it('does not inject the removed relay pill', () => {
+    expect(document.querySelector('cira-relay-pill')).toBeNull();
   });
 
   it('answers Read chat (EXTRACT_REQUEST) with the conversation', async () => {

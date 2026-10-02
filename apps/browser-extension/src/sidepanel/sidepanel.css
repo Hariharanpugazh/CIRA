@@ -618,8 +618,10 @@ label.cp-row-body { cursor: pointer; }
 }
 .cp-provider-row { display: grid; grid-template-columns: 64px 1fr; align-items: center; gap: 6px; font-size: 11.5px; }
 .cp-provider-row label { color: var(--muted-foreground); }
+.cp-provider-row--actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .cp-provider-key { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .cp-provider-key .cp-input { flex: 1; }
+.cp-hint--error { color: var(--destructive, #e5484d); }
 .cp-row-head { flex-wrap: wrap; }
 .cp-origin {
   padding: 1px 6px;

@@ -1,12 +1,22 @@
 /** UI-side helpers for the PCO pipeline running in the service worker. */
 import type { PCODocument } from '@cira/core';
 import type { SaveContextResponse, SyncResult } from '@/background/context-pipeline';
-import type { BuildDraftResponse } from '@/background/extraction';
+import type { BuildDraftResponse, ListModelsResponse } from '@/background/extraction';
 import type { ContextSelection } from './context-selection';
 import type { RuntimeMessage } from './messaging';
 import type { Conversation } from './schema';
 
-export type { BuildDraftResponse, SaveContextResponse, SyncResult };
+export type { BuildDraftResponse, ListModelsResponse, SaveContextResponse, SyncResult };
+
+/** Ask the service worker which models the configured provider + key can access. */
+export async function listProviderModels(): Promise<ListModelsResponse> {
+  try {
+    const res = (await chrome.runtime.sendMessage({ type: 'CIRA/LIST_MODELS' } satisfies RuntimeMessage)) as ListModelsResponse | undefined;
+    return res ?? { ok: false, code: 'unknown', error: 'No response from the CIRA service worker' };
+  } catch (err) {
+    return { ok: false, code: 'unknown', error: err instanceof Error ? err.message : String(err) };
+  }
+}
 
 /** Ask the service worker for a semantic / hybrid draft of the selected messages. */
 export async function buildDraft(conversation: Conversation, messageIndexes: number[], mode: 'semantic' | 'hybrid'): Promise<BuildDraftResponse> {

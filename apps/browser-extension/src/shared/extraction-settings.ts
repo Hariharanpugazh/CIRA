@@ -13,7 +13,16 @@ export type { ExtractionMode };
 
 export const EXTRACTION_MODES: readonly ExtractionMode[] = ['deterministic', 'semantic', 'hybrid'];
 
-export type ProviderPreset = 'ollama' | 'openai-compatible';
+export type ProviderPreset = 
+  | 'ollama' 
+  | 'openai' 
+  | 'anthropic' 
+  | 'google' 
+  | 'xai' 
+  | 'groq' 
+  | 'openrouter' 
+  | 'lm-studio'
+  | 'custom';
 
 export interface ProviderSettings {
   preset: ProviderPreset;
@@ -29,6 +38,90 @@ export interface ExtractionSettings {
 }
 
 export const OLLAMA_BASE_URL = 'http://127.0.0.1:11434/v1';
+export const LM_STUDIO_BASE_URL = 'http://127.0.0.1:1234/v1';
+
+export interface ProviderPresetInfo {
+  label: string;
+  baseUrl: string;
+  requiresApiKey: boolean;
+  modelPlaceholder: string;
+  modelSuggestions?: string[];
+  helpText?: string;
+}
+
+export const PROVIDER_PRESETS: Record<ProviderPreset, ProviderPresetInfo> = {
+  ollama: {
+    label: 'Ollama (local)',
+    baseUrl: OLLAMA_BASE_URL,
+    requiresApiKey: false,
+    modelPlaceholder: 'e.g. qwen2.5:7b',
+    modelSuggestions: ['qwen2.5:7b', 'qwen2.5:14b', 'llama3.3:70b', 'mistral:7b', 'phi4:14b'],
+    helpText: 'Run models locally. Requires OLLAMA_ORIGINS=chrome-extension://* to allow browser access.',
+  },
+  'lm-studio': {
+    label: 'LM Studio (local)',
+    baseUrl: LM_STUDIO_BASE_URL,
+    requiresApiKey: false,
+    modelPlaceholder: 'e.g. TheBloke/Llama-2-7B-Chat-GGUF',
+    helpText: 'Local models via LM Studio. The model name comes from what you loaded in LM Studio.',
+  },
+  openai: {
+    label: 'OpenAI',
+    baseUrl: 'https://api.openai.com/v1',
+    requiresApiKey: true,
+    modelPlaceholder: 'e.g. gpt-4o-mini',
+    modelSuggestions: ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-3.5-turbo'],
+    helpText: 'OpenAI models. API key required.',
+  },
+  anthropic: {
+    label: 'Anthropic (Claude)',
+    baseUrl: 'https://api.anthropic.com/v1',
+    requiresApiKey: true,
+    modelPlaceholder: 'e.g. claude-3-5-sonnet-20241022',
+    modelSuggestions: ['claude-3-5-sonnet-20241022', 'claude-3-5-haiku-20241022', 'claude-3-opus-20240229'],
+    helpText: 'Anthropic Claude models via their direct API.',
+  },
+  google: {
+    label: 'Google (Gemini)',
+    baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai/',
+    requiresApiKey: true,
+    modelPlaceholder: 'e.g. gemini-2.5-flash',
+    modelSuggestions: ['gemini-flash-latest', 'gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.5-flash-lite'],
+    helpText: 'Google Gemini models via OpenAI-compatible endpoint. Note: gemini-1.5-* and 2.0-* models are retired and return 404; use a 2.5+ model.',
+  },
+  xai: {
+    label: 'xAI (Grok)',
+    baseUrl: 'https://api.x.ai/v1',
+    requiresApiKey: true,
+    modelPlaceholder: 'e.g. grok-2-latest',
+    modelSuggestions: ['grok-2-latest', 'grok-2-1212', 'grok-beta'],
+    helpText: 'xAI Grok models. API key required.',
+  },
+  groq: {
+    label: 'Groq',
+    baseUrl: 'https://api.groq.com/openai/v1',
+    requiresApiKey: true,
+    modelPlaceholder: 'e.g. llama-3.3-70b-versatile',
+    modelSuggestions: ['llama-3.3-70b-versatile', 'mixtral-8x7b-32768', 'gemma2-9b-it'],
+    helpText: 'Fast inference on Groq LPUs. API key required.',
+  },
+  openrouter: {
+    label: 'OpenRouter',
+    baseUrl: 'https://openrouter.ai/api/v1',
+    requiresApiKey: true,
+    modelPlaceholder: 'e.g. anthropic/claude-3.5-sonnet',
+    modelSuggestions: ['anthropic/claude-3.5-sonnet', 'openai/gpt-4o', 'google/gemini-2.5-flash'],
+    helpText: 'Unified access to 200+ models. API key required.',
+  },
+  custom: {
+    label: 'Custom OpenAI-compatible',
+    baseUrl: '',
+    requiresApiKey: false,
+    modelPlaceholder: 'model name',
+    helpText: 'Any OpenAI-compatible Chat Completions endpoint (vLLM, llama.cpp server, etc.).',
+  },
+};
+
 /** Kept below the 5-minute cap Chrome puts on a single service-worker task. */
 export const BROWSER_SEMANTIC_TIMEOUT_MS = 120_000;
 /** chrome.storage.session key for the optional API key. */
@@ -54,8 +147,12 @@ export function normalizeSettings(raw: unknown): ExtractionSettings {
   const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
   const p = (r.provider && typeof r.provider === 'object' ? r.provider : {}) as Record<string, unknown>;
   const mode = EXTRACTION_MODES.includes(r.extractionMode as ExtractionMode) ? (r.extractionMode as ExtractionMode) : 'deterministic';
-  const preset: ProviderPreset = p.preset === 'openai-compatible' ? 'openai-compatible' : 'ollama';
-  const baseUrl = typeof p.baseUrl === 'string' && p.baseUrl.trim() ? p.baseUrl.trim() : preset === 'ollama' ? OLLAMA_BASE_URL : '';
+  
+  const presetKey = p.preset as string;
+  const preset: ProviderPreset = presetKey && presetKey in PROVIDER_PRESETS ? (presetKey as ProviderPreset) : 'ollama';
+  const presetInfo = PROVIDER_PRESETS[preset];
+  
+  const baseUrl = typeof p.baseUrl === 'string' && p.baseUrl.trim() ? p.baseUrl.trim() : presetInfo.baseUrl;
   const model = typeof p.model === 'string' ? p.model.trim() : '';
   return { extractionMode: mode, provider: { preset, baseUrl, model } };
 }
@@ -99,7 +196,7 @@ export function providerOriginPattern(baseUrl: string): string | null {
 export function privacyHint(mode: ExtractionMode, p: ProviderSettings): string {
   if (mode === 'deterministic') return 'Nothing is sent to an AI provider.';
   if (isLocalProvider(p)) {
-    return p.preset === 'ollama' ? 'Processing locally with Ollama. Selected messages stay on this machine.' : `Processing locally at ${providerHost(p)}. Selected messages stay on this machine.`;
+    return `Processing locally at ${providerHost(p)}. Selected messages stay on this machine.`;
   }
   const host = isValidBaseUrl(p.baseUrl) ? providerHost(p) : 'the configured AI provider';
   return `Selected messages will be sent to ${host}. Unselected messages are never sent.`;

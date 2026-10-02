@@ -30,7 +30,7 @@ import { useWorkspace } from './hooks/useWorkspace';
 import { selectedItemIds } from './state/workspace';
 
 export function SidePanel() {
-  const { state, dispatch, tab, hasApiKey, readChat, reloadTab, continueToReview, submit, retrySync, clearActive, editActive, setMode, setProvider, setApiKey } =
+  const { state, dispatch, tab, hasApiKey, readChat, reloadTab, continueToReview, submit, retrySync, clearActive, editActive, setMode, setProvider, setApiKey, fetchModels } =
     useWorkspace();
   const { step, conversation, busy } = state;
   const semantic = useMemo(() => (state.draft ? getSemanticExtension(state.draft) : undefined), [state.draft]);
@@ -181,6 +181,7 @@ export function SidePanel() {
                 onProvider: setProvider,
                 onProviderOpen: (open) => dispatch({ type: 'provider/open', open }),
                 onApiKey: (key) => void setApiKey(key),
+                onFetchModels: fetchModels,
               }
             : undefined
         }

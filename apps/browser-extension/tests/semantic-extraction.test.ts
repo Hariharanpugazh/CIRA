@@ -2,7 +2,7 @@
  * Phase 02C: semantic / hybrid drafts built by the service worker, and saving
  * a reviewed draft without re-extracting.
  */
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   createMemoryArea,
   getSemanticExtension,
@@ -13,7 +13,7 @@ import {
   type PCODocument,
 } from '@cira/core';
 import { saveConversationAsPco } from '@/background/context-pipeline';
-import { buildSemanticDraft, type BuildDraftSuccess, type DraftDeps } from '@/background/extraction';
+import { buildSemanticDraft, listProviderModels, type BuildDraftSuccess, type DraftDeps } from '@/background/extraction';
 import { applyItemSelection, buildPcoHandoff, buildSelectedContext, SELECTION_EXTENSION } from '@/shared/context-selection';
 import { OLLAMA_BASE_URL, providerOriginPattern, type ProviderSettings } from '@/shared/extraction-settings';
 import { ChromeContextStore } from '@/storage/chrome-context-store';
@@ -22,7 +22,7 @@ import { chatCompletion, fakeOpenAI, tenMessageConversation } from './helpers/fa
 const CLIENT = 'cira-browser-extension@0.1.0';
 const NOW = () => new Date('2026-09-30T12:00:00.000Z');
 const OLLAMA: ProviderSettings = { preset: 'ollama', baseUrl: OLLAMA_BASE_URL, model: 'qwen2.5:7b' };
-const REMOTE: ProviderSettings = { preset: 'openai-compatible', baseUrl: 'https://api.example.com/v1', model: 'gpt-x' };
+const REMOTE: ProviderSettings = { preset: 'openai', baseUrl: 'https://api.example.com/v1', model: 'gpt-x' };
 const SELECTED = [1, 4, 6, 8];
 
 function deps(over: Partial<DraftDeps> = {}): DraftDeps {
@@ -226,5 +226,53 @@ describe('saving a reviewed semantic draft', () => {
     const { document } = buildSelectedContext(conv, { messageIndexes: SELECTED }, { client: CLIENT, now: NOW() });
     const text = buildPcoHandoff(document, { source: conv.source });
     expect(text).not.toMatch(/assistant suggestion|PROPOSED|previous assistant/);
+  });
+});
+
+describe('listProviderModels (service worker)', () => {
+  function stubFetch(status: number, body: string) {
+    const calls: Array<{ url: string; headers: Record<string, string> }> = [];
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init: { headers: Record<string, string> }) => {
+      calls.push({ url, headers: init.headers });
+      return { status, async text() { return body; } };
+    }));
+    return calls;
+  }
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('returns the key-accessible models for a remote provider, with the key only in the header', async () => {
+    const calls = stubFetch(200, JSON.stringify({ data: [{ id: 'gpt-4o-mini' }, { id: 'gpt-4o' }] }));
+    const r = await listProviderModels({ provider: REMOTE, apiKey: 'sk-SECRET' });
+    expect(r).toEqual({ ok: true, models: ['gpt-4o', 'gpt-4o-mini'], host: 'api.example.com' });
+    expect(calls[0].url).toBe('https://api.example.com/v1/models');
+    expect(calls[0].headers.authorization).toBe('Bearer sk-SECRET');
+  });
+
+  it('requires permission for the provider origin before any network call', async () => {
+    const calls = stubFetch(200, JSON.stringify({ data: [{ id: 'm' }] }));
+    const r = await listProviderModels({ provider: REMOTE, apiKey: 'k', hasPermission: async () => false });
+    expect(r).toMatchObject({ ok: false, code: 'permission' });
+    expect(calls).toHaveLength(0);
+  });
+
+  it('maps a 401 to an unauthorized error and never leaks the key', async () => {
+    stubFetch(401, JSON.stringify({ error: { message: 'invalid api key' } }));
+    const r = await listProviderModels({ provider: REMOTE, apiKey: 'sk-SECRET' });
+    expect(r).toMatchObject({ ok: false, code: 'unauthorized' });
+    expect(JSON.stringify(r)).not.toContain('sk-SECRET');
+  });
+
+  it('works for a local provider with no key', async () => {
+    const calls = stubFetch(200, JSON.stringify({ models: [{ name: 'qwen2.5:7b' }] }));
+    const r = await listProviderModels({ provider: OLLAMA });
+    expect(r).toEqual({ ok: true, models: ['qwen2.5:7b'], host: '127.0.0.1:11434' });
+    expect(calls[0].headers.authorization).toBeUndefined();
+  });
+
+  it('rejects an unconfigured (empty) endpoint without a network call', async () => {
+    const calls = stubFetch(200, '{}');
+    const r = await listProviderModels({ provider: { preset: 'custom', baseUrl: '', model: '' } });
+    expect(r).toMatchObject({ ok: false, code: 'not_configured' });
+    expect(calls).toHaveLength(0);
   });
 });

@@ -165,18 +165,6 @@ async function choose(select: HTMLSelectElement | null, value: string) {
     select.dispatchEvent(new Event('change', { bubbles: true }));
   });
 }
-async function fill(input: HTMLInputElement | undefined | null, value: string) {
-  if (!input) throw new Error(`missing input\n${text().slice(0, 2000)}`);
-  await act(async () => {
-    input.focus();
-    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, value);
-    input.dispatchEvent(new Event('input', { bubbles: true }));
-  });
-  await act(async () => {
-    input.blur();
-    input.dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
-  });
-}
 const modeSelect = () => container.querySelector<HTMLSelectElement>('#cp-mode-select');
 const messageRows = () => $$('ul[aria-label="Conversation messages"] > li');
 const itemRows = () => $$('ul[aria-label="Extracted context items"] > li');
@@ -250,7 +238,7 @@ describe('side panel semantic integration', () => {
 
     await choose(modeSelect(), 'semantic');
     expect(text()).toContain('Uses an AI model to identify important context.');
-    expect(text()).toContain('Processing locally with Ollama.');
+    expect(text()).toContain('Processing locally at');
     expect((fake.local.get(SETTINGS_KEY) as { extractionMode: string }).extractionMode).toBe('semantic');
     expect(fake.builds).toHaveLength(0); // changing the mode never calls a model
 
@@ -261,7 +249,9 @@ describe('side panel semantic integration', () => {
     expect(fake.builds).toHaveLength(0);
     expect(text()).toContain('Selected 4 / 10 messages');
 
-    await fill(container.querySelector<HTMLInputElement>('#cp-provider input[type="text"]'), 'qwen2.5:7b');
+    // Ollama uses a select dropdown for model suggestions
+    const modelSelect = container.querySelector<HTMLSelectElement>('#cp-provider select[id$="-model"]');
+    await choose(modelSelect, 'qwen2.5:7b');
     expect((fake.local.get(SETTINGS_KEY) as { provider: { model: string } }).provider.model).toBe('qwen2.5:7b');
 
     await click(button('Continue to Review'));
