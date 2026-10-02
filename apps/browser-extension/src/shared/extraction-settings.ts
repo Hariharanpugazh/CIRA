@@ -201,3 +201,65 @@ export function privacyHint(mode: ExtractionMode, p: ProviderSettings): string {
   const host = isValidBaseUrl(p.baseUrl) ? providerHost(p) : 'the configured AI provider';
   return `Selected messages will be sent to ${host}. Unselected messages are never sent.`;
 }
+
+// ── Ollama setup guidance ───────────────────────────────────────────────────
+
+export type OllamaOS = 'windows' | 'mac' | 'linux';
+
+/** The origin browser extensions need Ollama to allow. */
+export const OLLAMA_EXTENSION_ORIGIN = 'chrome-extension://*';
+
+/** Best-effort OS detection from a user-agent string (defaults to windows). */
+export function detectOS(userAgent: string): OllamaOS {
+  const ua = userAgent.toLowerCase();
+  if (ua.includes('mac') || ua.includes('darwin')) return 'mac';
+  if (ua.includes('win')) return 'windows';
+  if (ua.includes('linux') || ua.includes('x11')) return 'linux';
+  return 'windows';
+}
+
+export interface OllamaSetupStep {
+  os: OllamaOS;
+  osLabel: string;
+  /** The one command the user copies and runs. */
+  command: string;
+  /** How to make Ollama pick it up afterwards. */
+  restartHint: string;
+}
+
+/**
+ * The exact, copy-pasteable command to allow browser extensions to reach
+ * Ollama on each OS, plus the restart note. This is the whole fix for the
+ * HTTP 403 Ollama returns to extensions by default.
+ */
+export function ollamaSetupStep(os: OllamaOS): OllamaSetupStep {
+  switch (os) {
+    case 'mac':
+      return {
+        os,
+        osLabel: 'macOS',
+        command: `launchctl setenv OLLAMA_ORIGINS "${OLLAMA_EXTENSION_ORIGIN}"`,
+        restartHint: 'Then quit Ollama from the menu bar and reopen it.',
+      };
+    case 'linux':
+      return {
+        os,
+        osLabel: 'Linux',
+        command: `systemctl edit ollama   # add:  Environment="OLLAMA_ORIGINS=${OLLAMA_EXTENSION_ORIGIN}"`,
+        restartHint: 'Then run: sudo systemctl restart ollama',
+      };
+    case 'windows':
+    default:
+      return {
+        os: 'windows',
+        osLabel: 'Windows',
+        command: `setx OLLAMA_ORIGINS "${OLLAMA_EXTENSION_ORIGIN}"`,
+        restartHint: 'Then fully quit Ollama from the system tray (right-click → Quit) and reopen it.',
+      };
+  }
+}
+
+/** True when a semantic failure is Ollama's CORS/origin rejection for a local provider. */
+export function isOllamaCorsError(code: string, p: ProviderSettings): boolean {
+  return code === 'forbidden' && isLocalProvider(p);
+}

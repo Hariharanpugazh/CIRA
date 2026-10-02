@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_SETTINGS, normalizeSettings, privacyHint, providerProblem, OLLAMA_BASE_URL } from '@/shared/extraction-settings';
+import { DEFAULT_SETTINGS, detectOS, isOllamaCorsError, normalizeSettings, ollamaSetupStep, privacyHint, providerProblem, OLLAMA_BASE_URL, type ProviderSettings } from '@/shared/extraction-settings';
 import { draftKeyFor, initialWorkspace, workspaceReducer, type WorkspaceState } from '@/sidepanel/state/workspace';
 import { selectionConversation } from './helpers/selection-conversation';
 
@@ -67,5 +67,31 @@ describe('extraction mode state', () => {
     expect(providerProblem({ ...local, model: '' })).toMatch(/model name/);
     expect(providerProblem({ ...local, baseUrl: 'http://example.com/v1' })).toMatch(/https/);
     expect(providerProblem({ ...local, baseUrl: 'https://user:pw@example.com/v1' })).toMatch(/valid/);
+  });
+
+  it('detects the OS from the user agent, defaulting to windows', () => {
+    expect(detectOS('Mozilla/5.0 (Windows NT 10.0; Win64; x64)')).toBe('windows');
+    expect(detectOS('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)')).toBe('mac');
+    expect(detectOS('Mozilla/5.0 (X11; Linux x86_64)')).toBe('linux');
+    expect(detectOS('something unexpected')).toBe('windows');
+  });
+
+  it('gives the right OLLAMA_ORIGINS command per OS', () => {
+    expect(ollamaSetupStep('windows').command).toBe('setx OLLAMA_ORIGINS "chrome-extension://*"');
+    expect(ollamaSetupStep('mac').command).toContain('launchctl setenv OLLAMA_ORIGINS');
+    expect(ollamaSetupStep('linux').command).toContain('OLLAMA_ORIGINS=chrome-extension://*');
+    for (const os of ['windows', 'mac', 'linux'] as const) {
+      expect(ollamaSetupStep(os).command).toContain('chrome-extension://*');
+      expect(ollamaSetupStep(os).restartHint).toBeTruthy();
+    }
+  });
+
+  it('recognises the Ollama CORS error only for a local provider', () => {
+    const local: ProviderSettings = { preset: 'ollama', baseUrl: OLLAMA_BASE_URL, model: 'm' };
+    const remote: ProviderSettings = { preset: 'openai', baseUrl: 'https://api.openai.com/v1', model: 'm' };
+    expect(isOllamaCorsError('forbidden', local)).toBe(true);
+    expect(isOllamaCorsError('forbidden', remote)).toBe(false);
+    expect(isOllamaCorsError('unauthorized', local)).toBe(false);
+    expect(isOllamaCorsError('timeout', local)).toBe(false);
   });
 });

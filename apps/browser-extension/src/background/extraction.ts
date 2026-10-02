@@ -121,8 +121,8 @@ export function describeSemanticFailure(diagnostics: readonly ExtractionDiagnost
       return {
         code: 'forbidden',
         message: local
-          ? `${host} refused the request (HTTP 403). Ollama blocks browser extensions unless OLLAMA_ORIGINS includes chrome-extension://* (then restart Ollama).`
-          : `${host} refused the request (HTTP 403).`,
+          ? `${host} refused the request (HTTP 403). Ollama blocks browser extensions until you allow this origin. Set OLLAMA_ORIGINS to chrome-extension://* and FULLY restart Ollama (quit from the tray, not just close the window), then press Retry. Windows: run \`setx OLLAMA_ORIGINS "chrome-extension://*"\` in PowerShell. macOS: \`launchctl setenv OLLAMA_ORIGINS "chrome-extension://*"\`. Linux: add Environment="OLLAMA_ORIGINS=chrome-extension://*" to the ollama systemd service.`
+          : `${host} refused the request (HTTP 403). The provider rejected the request — check that the API key is valid and has access to this model.`,
       };
     }
     if (status === 404) return { code: 'http', message: `${host} returned HTTP 404. Check the endpoint URL and that the model "${provider.model}" is installed.` };

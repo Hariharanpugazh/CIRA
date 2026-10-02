@@ -11,7 +11,7 @@ import { useMemo, type ReactNode } from 'react';
 import { getSemanticExtension, scanDocument } from '@cira/core';
 import { describeSync } from '@/shared/context-client';
 import { applyItemSelection, buildPcoHandoff, estimateTokens } from '@/shared/context-selection';
-import { MODE_LABEL } from '@/shared/extraction-settings';
+import { isOllamaCorsError, MODE_LABEL } from '@/shared/extraction-settings';
 import { ExtractionModeHint, ExtractionModeSelect, ProviderForm, type ExtractionModeControlProps } from './components/ExtractionModeControl';
 import { brandFor, relayTargets } from './brands';
 import { ActiveContextCard } from './components/ActiveContextCard';
@@ -23,6 +23,7 @@ import { Header } from './components/Header';
 import { ChevronLeftIcon, RefreshIcon, SaveIcon, SendIcon } from './components/icons';
 import { LoadingState } from './components/LoadingState';
 import { MessageSelector } from './components/MessageSelector';
+import { OllamaSetupGuide } from './components/OllamaSetupGuide';
 import { StatusBanner } from './components/StatusBanner';
 import { StepIndicator } from './components/StepIndicator';
 import { TargetSelector } from './components/TargetSelector';
@@ -75,7 +76,21 @@ export function SidePanel() {
         <StatusBanner level="error" title={state.error} onDismiss={() => dispatch({ type: 'error/dismiss' })} />
       )}
 
-      {state.semanticError && (
+      {state.semanticError && isOllamaCorsError(state.semanticError.code, state.provider) && (
+        <OllamaSetupGuide
+          provider={state.provider}
+          disabled={!!busy}
+          onTest={async () => {
+            const r = await fetchModels();
+            return r.ok ? { ok: true } : { ok: false, error: r.error };
+          }}
+          onRetry={() => void continueToReview()}
+          onSwitchDeterministic={() => void continueToReview('deterministic')}
+          onDismiss={() => dispatch({ type: 'error/dismiss' })}
+        />
+      )}
+
+      {state.semanticError && !isOllamaCorsError(state.semanticError.code, state.provider) && (
         <StatusBanner
           level="error"
           title="Semantic extraction unavailable."
